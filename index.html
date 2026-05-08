@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JVL-RM Rx Error NLP Analyzer</title>
+    <title>JVL-RM Medication Error Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -29,6 +29,7 @@
         .card-clickable { cursor: pointer; transition: all 0.2s; }
         .card-clickable:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         .highlight-drug { background-color: #fef08a; font-weight: 600; color: #166534; padding: 0 4px; border-radius: 4px; }
+        table.dataTable thead .sorting, table.dataTable thead .sorting_asc, table.dataTable thead .sorting_desc { cursor: pointer; }
     </style>
 </head>
 <body class="p-6 flex flex-col">
@@ -41,12 +42,12 @@
             <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-6 max-w-3xl mx-auto mb-8 text-left">
                 <h3 class="text-emerald-800 font-bold mb-2 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                    ระบบวิเคราะห์ความคลาดเคลื่อนทางยา (อัปเกรด AI-Dictionary)
+                    ระบบวิเคราะห์ความคลาดเคลื่อนทางยา (Cross-Filtering & Drug Grouper)
                 </h3>
                 <ul class="list-disc list-inside text-gray-700 space-y-2 text-sm md:text-base">
-                    <li>ระบบสามารถกรองคำศัพท์เฉพาะ (เช่น Hold, Off, ECT, Robot) ออกจากการเป็นชื่อยาได้</li>
-                    <li>รองรับการจับคู่ตัวย่อ (เช่น A2 = Trihexyphenidyl 2 mg, Valium = Diazepam)</li>
-                    <li>วิเคราะห์ความสัมพันธ์เชิงลึก (ยาชนิดไหน มักเกิดข้อผิดพลาดประเภทใด)</li>
+                    <li>จัดกลุ่มชื่อยาอัตโนมัติ (เช่น หลอมรวมความแรงต่างๆ เข้าสู่ Generic Name) ในหน้า Dashboard</li>
+                    <li>เมื่อคลิกที่กราฟ ระบบจะทำ <b>Cross-Filtering</b> (กรองข้อมูลทุกส่วนบนหน้าจอให้สัมพันธ์กัน)</li>
+                    <li>พร้อมตาราง <b>Insight Report</b> อัตโนมัติ เพื่อนำไปสรุปผลและวางแผนป้องกัน</li>
                 </ul>
             </div>
             <label class="inline-block bg-emerald-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-emerald-700 cursor-pointer transition shadow-md">
@@ -70,7 +71,7 @@
 
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-gray-700 flex items-center gap-2">ตัวกรองข้อมูล (Slicers)</h3>
+                    <h3 class="font-bold text-gray-700 flex items-center gap-2">ตัวกรองข้อมูลหลัก (Global Slicers)</h3>
                     <button onclick="resetFilters()" class="text-sm text-emerald-600 hover:text-emerald-800 font-medium bg-emerald-50 px-3 py-1 rounded">ล้างตัวกรองทั้งหมด</button>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -88,50 +89,85 @@
                 </div>
             </div>
 
+            <div id="activeFilterBar" style="display: none;" class="bg-blue-600 text-white p-3 rounded-xl flex flex-col md:flex-row justify-between items-center shadow-md animate-pulse">
+                <div class="flex items-center gap-2 mb-2 md:mb-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                    <span class="font-bold">ข้อมูลกำลังถูกกรองลึกโดย:</span> 
+                    <span id="activeFilterText" class="font-medium bg-blue-800 px-3 py-1 rounded-lg text-sm">...</span>
+                </div>
+                <button onclick="clearDrillDown()" class="bg-white text-blue-700 px-4 py-1.5 rounded-lg font-bold text-sm hover:bg-blue-50 transition shadow-sm w-full md:w-auto">
+                    ✕ ยกเลิกการกรอง (ดูภาพรวม)
+                </button>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="summaryCards">
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-emerald-100 border-l-4 border-l-emerald-500 card-clickable" onclick="triggerDrillDown('all', 'ทั้งหมด')">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-emerald-100 border-l-4 border-l-emerald-500">
                     <h3 class="text-gray-500 text-xs font-medium">ความคลาดเคลื่อนทั้งหมด</h3>
                     <p class="text-3xl font-bold text-gray-800 mt-1" id="totalIncidents">0</p>
                     <p class="text-xs text-emerald-500 mt-1 font-medium" id="totalPercentMsg"></p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-red-100 border-l-4 border-l-red-500 card-clickable" id="severeCard">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-red-100 border-l-4 border-l-red-500 card-clickable" onclick="triggerDrillDown('severe', 'E,F,G,H,I')">
                     <h3 class="text-gray-500 text-xs font-medium">ระดับ E ขึ้นไป</h3>
                     <p class="text-3xl font-bold text-gray-800 mt-1" id="severeIncidents">0</p>
                     <p class="text-xs text-red-500 mt-1 font-medium" id="severePercentMsg"></p>
-                    <p class="text-[10px] text-gray-400 mt-1">👆 คลิกเพื่อดูตาราง</p>
+                    <p class="text-[10px] text-gray-400 mt-1">👆 คลิกเพื่อกรองข้อมูล</p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-blue-100 border-l-4 border-l-blue-500 card-clickable" id="topErrorCard">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-blue-100 border-l-4 border-l-blue-500 card-clickable" onclick="triggerDrillDown('errorType', document.getElementById('topErrorRaw').value)">
                     <h3 class="text-gray-500 text-xs font-medium">ประเภทที่ผิดบ่อยสุด</h3>
                     <p class="text-lg font-bold text-blue-700 mt-1 truncate" id="topError">-</p>
                     <p class="text-xs text-blue-500 mt-1 font-medium" id="topErrorMsg"></p>
-                    <p class="text-[10px] text-blue-400 mt-1">👆 คลิกเพื่อดูตาราง</p>
+                    <input type="hidden" id="topErrorRaw" value="">
+                    <p class="text-[10px] text-blue-400 mt-1">👆 คลิกเพื่อกรองข้อมูล</p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-amber-500 card-clickable" id="topDrugCard">
-                    <h3 class="text-gray-500 text-xs font-medium">ยาที่ตรวจพบปัญหามากสุด</h3>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-amber-500 card-clickable" onclick="triggerDrillDown('drug', document.getElementById('topDrugRaw').value)">
+                    <h3 class="text-gray-500 text-xs font-medium">กลุ่มยาที่มีปัญหามากสุด</h3>
                     <p class="text-lg font-bold text-amber-700 mt-1 truncate" id="topDrug">-</p>
                     <p class="text-xs text-amber-600 mt-1 font-medium" id="topDrugMsg"></p>
-                    <p class="text-[10px] text-amber-400 mt-1">👆 คลิกเพื่อดูตาราง</p>
+                    <input type="hidden" id="topDrugRaw" value="">
+                    <p class="text-[10px] text-amber-400 mt-1">👆 คลิกเพื่อกรองข้อมูล</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="dashboardArea">
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100"><h3 class="font-bold text-gray-700 mb-2 text-xs">ประเภทความคลาดเคลื่อน (Top 10)</h3><div class="chart-container"><canvas id="errorTypeChart"></canvas></div></div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100"><h3 class="font-bold text-emerald-700 mb-2 text-xs">💊 ยาที่สกัดพบปัญหาบ่อยที่สุด (Top 15 Extracted Drugs)</h3><div class="chart-container"><canvas id="drugChart"></canvas></div></div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100"><h3 class="font-bold text-emerald-700 mb-2 text-xs">💊 กลุ่มยาที่พบปัญหาบ่อยที่สุด (Top 15)</h3><div class="chart-container"><canvas id="drugChart"></canvas></div></div>
                 
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
                     <div class="flex justify-between items-center mb-2">
-                        <h3 class="font-bold text-indigo-700 text-xs">🔗 ความสัมพันธ์เชิงลึก: ยาชนิดใด มักเกิดข้อผิดพลาดประเภทใด (Top 15 ยา)</h3>
+                        <h3 class="font-bold text-indigo-700 text-xs">🔗 ความสัมพันธ์เชิงลึก: กลุ่มยาชนิดใด มักเกิดข้อผิดพลาดประเภทใด (Top 15)</h3>
                     </div>
                     <div class="chart-container-large"><canvas id="relationChart"></canvas></div>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-emerald-200 mt-8" id="nlpSection">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-indigo-200 mt-4" id="insightReportSection">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="bg-indigo-100 p-2 rounded-lg text-indigo-700 font-bold">Insight Report</div>
+                    <h3 class="font-bold text-gray-700 text-lg">ตารางสรุปความสัมพันธ์ (กลุ่มยา x ประเภทความคลาดเคลื่อน)</h3>
+                </div>
+                <p class="text-xs text-indigo-600 mb-4 font-medium">* ตารางนี้จะสรุปความสัมพันธ์ของข้อมูลที่แสดงอยู่บน Dashboard ให้โดยอัตโนมัติ พร้อมสัดส่วนร้อยละ สำหรับนำไปจัดทำรายงาน</p>
+                
+                <div class="overflow-x-auto">
+                    <table id="insightTable" class="w-full text-sm text-left border-collapse">
+                        <thead>
+                            <tr class="bg-indigo-50 text-indigo-800">
+                                <th class="p-2 border">ประเภทความคลาดเคลื่อน (Error Type)</th>
+                                <th class="p-2 border">กลุ่มยาหลัก (Generic/Base Name)</th>
+                                <th class="p-2 border text-center">จำนวนที่พบ (ครั้ง)</th>
+                                <th class="p-2 border text-center">ร้อยละ (เทียบกับทั้งหมด)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="insightTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-emerald-200 mt-4" id="nlpSection">
                 <div class="flex items-center gap-2 mb-1">
                     <div class="bg-emerald-100 p-2 rounded-lg text-emerald-700 font-bold">NLP-Lite Extractor</div>
-                    <h3 class="font-bold text-gray-700 text-lg" id="tableTitle">ตารางสกัดข้อมูลความคลาดเคลื่อนทางยา</h3>
+                    <h3 class="font-bold text-gray-700 text-lg" id="tableTitle">ตารางเจาะลึกความคลาดเคลื่อนทางยา</h3>
                 </div>
-                <p class="text-xs text-emerald-600 mb-4 font-medium">* ระบบสกัดและกรองตัวย่อ/ชื่อยา จากรายละเอียดอัตโนมัติ (คลิกที่กราฟ/การ์ดด้านบน เพื่อกรองตารางนี้ได้ทันที)</p>
+                <p class="text-xs text-emerald-600 mb-4 font-medium">* ตารางนี้แสดงรายละเอียดเชิงลึกและ <b>ความแรงของยาที่เกิดปัญหาจริง (Specific Strengths)</b> ตามที่ถูกสกัดมาจากรายละเอียด</p>
                 
                 <div class="overflow-x-auto">
                     <table id="nlpTable" class="w-full text-xs text-left border-collapse">
@@ -140,7 +176,7 @@
                                 <th class="p-2 border whitespace-nowrap text-center">วันที่เกิดเหตุ</th>
                                 <th class="p-2 border text-center">ระดับ</th>
                                 <th class="p-2 border">ประเภท (Error Type)</th>
-                                <th class="p-2 border min-w-[150px]">💊 ยา (สกัดอัตโนมัติ)</th>
+                                <th class="p-2 border min-w-[180px]">💊 ยาที่เกี่ยวข้อง (ระบุความแรง)</th>
                                 <th class="p-2 border min-w-[300px]">รายละเอียดเหตุการณ์</th>
                             </tr>
                         </thead>
@@ -157,135 +193,131 @@
     <script>
         let charts = {};
         let rawData = []; 
-        let currentFilteredData = []; 
-        let currentTableData = []; // เก็บ State สำหรับตารางปัจจุบัน (ตอนกด Drill down)
+        let currentFilteredData = []; // กรองจาก Slicers บนสุด
+        let activeData = []; // กรองจาก Slicers + การคลิก Drill-down (ข้อมูลที่จะโชว์จริงในทุกกราฟ)
+        
+        let currentDrillDown = null; // เก็บ State ว่ากำลังกดคลิกอะไรอยู่ เช่น {type: 'drug', label: 'Risperidone'}
+
         let nlpTableInstance = null;
+        let insightTableInstance = null;
         let tomSelects = {}; 
         
         // ==========================================
-        // NLP-Lite: Rule-Based Drug Extractor V2
+        // 1. NLP-Lite Extractor & Base Name Grouper
         // ==========================================
         
-        // 1. เพิ่ม Stopwords อย่างละเอียดตามที่คุณให้ข้อมูลมา
         const stopwords = [
             'ipd', 'opd', 'med', 'medsheet', 'sheet', 'stat', 'prn', 'and', 'the', 'for', 'home', 'ward', 'doctor', 'nurse', 'pharmacy', 'error', 'type', 'order', 'iv', 'im', 'po', 'pc', 'ac', 'hs', 'od', 'bid', 'tid', 'qid', 'sig', 'tab', 'cap', 'mg', 'ml', 'g',
             'hold', 'ect', 'robot', 'tray', 'sts', 'lai', 'admit', 'drug', 'profile', 'mar', 'off', 'oral'
         ];
 
-        // 2. Dictionary จัดกลุ่มชื่อยา/ตัวย่อ (แปลงให้เป็นชื่อ Standard เสมอ)
+        // Dictionary ไว้จับตัวย่อแปลงเป็นรูปแบบเต็ม
         const drugDictionary = {
-            // Trihexyphenidyl
-            'a2': 'Trihexyphenidyl 2 mg', 'benz2': 'Trihexyphenidyl 2 mg', 'benzhexol2': 'Trihexyphenidyl 2 mg',
+            'a2': 'Trihexyphenidyl 2 mg', 'benz2': 'Trihexyphenidyl 2 mg', 'benzhexol2': 'Trihexyphenidyl 2 mg', 'aca': 'Trihexyphenidyl', 'trihex': 'Trihexyphenidyl',
             'a5': 'Trihexyphenidyl 5 mg', 'benz5': 'Trihexyphenidyl 5 mg', 'benzhexol5': 'Trihexyphenidyl 5 mg',
-            'aca': 'Trihexyphenidyl', 'trihex': 'Trihexyphenidyl',
-            // Risperidone
-            'ris': 'Risperidone', 'ris1': 'Risperidone 1 mg', 'risperidone1': 'Risperidone 1 mg',
-            'ris2': 'Risperidone 2 mg', 'risperidone2': 'Risperidone 2 mg',
-            // Diazepam
-            'valium': 'Diazepam 10 mg injection',
-            'dzp': 'Diazepam', 'dpz': 'Diazepam', 
-            'd2': 'Diazepam 2 mg', 'd5': 'Diazepam 5 mg', 'd10': 'Diazepam 10 mg',
-            // Haloperidol
+            'ris': 'Risperidone', 'ris1': 'Risperidone 1 mg', 'ris2': 'Risperidone 2 mg',
+            'valium': 'Diazepam 10 mg injection', 'dzp': 'Diazepam', 'dpz': 'Diazepam', 'd2': 'Diazepam 2 mg', 'd5': 'Diazepam 5 mg', 'd10': 'Diazepam 10 mg',
             'halo': 'Haloperidol', 'halo dec': 'Haloperidol Decanoate', 'halodec': 'Haloperidol Decanoate',
-            // Sodium Valproate
-            'vpa': 'Sodium Valproate', 'sod val': 'Sodium Valproate', 'sodval': 'Sodium Valproate',
-            'veltila': 'Sodium Valproate 500 mg',
-            // Diclofenac
+            'vpa': 'Sodium Valproate', 'sod val': 'Sodium Valproate', 'sodval': 'Sodium Valproate', 'veltila': 'Sodium Valproate 500 mg', 'depakin': 'Sodium Valproate', 'dep cr': 'Sodium Valproate',
             'dcf': 'Diclofenac',
-            // Thiamine / Vit B1
-            'vitamin b1': 'Thiamine', 'vit b1': 'Thiamine', 'vitb1': 'Thiamine', 'thiamine': 'Thiamine',
-            // Amlodipine
-            'amlo': 'Amlodipine',
-            // Atorvastatin
-            'atorvas': 'Atorvastatin',
-            // Chlorpromazine
-            'cpz': 'Chlorpromazine',
-            // Lorazepam
-            'lora': 'Lorazepam',
-            // Clorazepate
+            'vitamin b1': 'Vitamin B1', 'vit b1': 'Vitamin B1', 'vitb1': 'Vitamin B1', 'thiamine': 'Vitamin B1',
+            'amlo': 'Amlodipine', 'atorvas': 'Atorvastatin', 'cpz': 'Chlorpromazine', 'lora': 'Lorazepam',
             't5': 'Clorazepate 5 mg', 'tranxene': 'Clorazepate 5 mg',
-            // Methylphenidate
-            'ritalin': 'Methylphenidate', 'rubifen': 'Methylphenidate', 'concertra': 'Methylphenidate'
+            'ritalin': 'Methylphenidate', 'rubifen': 'Methylphenidate', 'concertra': 'Methylphenidate',
+            'clozapine': 'Clozapine', 'mianserin': 'Mianserin', 'nortriptyline': 'Nortriptyline', 'amitriptyline': 'Amitriptyline', 'trazodone': 'Trazodone', 'quetiapine': 'Quetiapine'
         };
 
+        // ฟังก์ชันสกัดชื่อยาจากข้อความ (จะได้ออกมาเป็นชื่อยา+ความแรงแบบ Specific)
         function extractDrugs(text) {
             if (!text) return [];
             let validDrugs = [];
             let textLower = text.toLowerCase();
 
-            // สแกนหาตาม Dictionary ก่อน (เพราะตัวย่อสั้นๆ Regex อาจจับยาก)
             for (let key in drugDictionary) {
-                // หาคำที่เป็นขอบเขตชัดเจน (Word Boundary) เพื่อกันการจับตัวอักษรซ้อนในคำอื่น
                 let regex = new RegExp(`\\b${key}\\b`, 'gi');
                 if (regex.test(textLower)) {
                     validDrugs.push(drugDictionary[key]);
                 }
             }
 
-            // Regex จับคำภาษาอังกฤษที่มีความยาว 3 ตัวอักษรขึ้นไปที่อาจจะหลุดรอดจาก Dictionary
             const regexGeneral = /\b[A-Za-z]{3,}(?:-\w+)?(?:\s*\d+(?:\.\d+)?\s*(?:mg|ml|g|mcg|mEq|%|tab|cap|amp|vial))?\b/gi;
             let matches = text.match(regexGeneral) || [];
             
             matches.forEach(m => {
                 let firstWord = m.trim().split(' ')[0].toLowerCase();
-                // ถ้าไม่ใช่ Stopword และยังไม่เคยมีใน validDrugs (หรือ Dictionary)
                 if (!stopwords.includes(firstWord)) {
                     let cleanName = m.trim();
                     cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
                     
-                    // ป้องกันการใส่ชื่อยาที่จับได้แล้วซ้ำซ้อน (เช่น Regex เจอ "Risperidone" แต่ Dictionary จับ "Risperidone 1 mg" ไว้แล้ว)
                     let isDuplicate = validDrugs.some(vd => vd.toLowerCase().includes(firstWord));
-                    if (!isDuplicate) {
-                        validDrugs.push(cleanName);
-                    }
+                    if (!isDuplicate) validDrugs.push(cleanName);
                 }
             });
-            
             return [...new Set(validDrugs)];
+        }
+
+        // ฟังก์ชันยุบรวมชื่อยาให้เป็น Generic Name สำหรับทำ Bar Chart และ Report
+        function getBaseDrugName(name) {
+            if (!name) return 'ไม่ระบุ';
+            let n = name.toLowerCase();
+            
+            if (n.includes('haloperidol decanoate') || n.includes('halo dec') || n.includes('halodec')) return 'Haloperidol Decanoate';
+            if (n.includes('haloperidol') || n.includes('halo')) return 'Haloperidol';
+            if (n.includes('lorazepam') || n.includes('lora')) return 'Lorazepam';
+            if (n.includes('perphenazine')) return 'Perphenazine';
+            if (n.includes('risperidone') || n.includes('ris')) return 'Risperidone';
+            if (n.includes('diazepam') || n.includes('valium') || n.match(/\bdzp\b/i) || n.match(/\bd\d+\b/i)) return 'Diazepam';
+            if (n.includes('trihexyphenidyl') || n.includes('benzhexol') || n.includes('aca') || n.match(/\ba[25]\b/i)) return 'Trihexyphenidyl';
+            if (n.includes('clonazepam')) return 'Clonazepam';
+            if (n.includes('clozapine')) return 'Clozapine';
+            if (n.includes('mianserin')) return 'Mianserin';
+            if (n.includes('nortriptyline')) return 'Nortriptyline';
+            if (n.includes('amitriptyline')) return 'Amitriptyline';
+            if (n.includes('trazodone')) return 'Trazodone';
+            if (n.includes('quetiapine')) return 'Quetiapine';
+            if (n.includes('chlorpromazine') || n.includes('cpz')) return 'Chlorpromazine';
+            if (n.includes('sodium') || n.includes('depakin') || n.includes('dep cr') || n.includes('veltila') || n.includes('valproate') || n.includes('vpa')) return 'Sodium Valproate';
+            if (n.includes('vitamin b1') || n.includes('thiamine') || n.includes('vit b1')) return 'Vitamin B1';
+            if (n.includes('clorazepate') || n.includes('tranxene')) return 'Clorazepate';
+            if (n.includes('methylphenidate') || n.includes('ritalin') || n.includes('rubifen') || n.includes('concertra')) return 'Methylphenidate';
+            if (n.includes('diclofenac') || n.includes('dcf')) return 'Diclofenac';
+            if (n.includes('amlodipine') || n.includes('amlo')) return 'Amlodipine';
+            if (n.includes('atorvastatin') || n.includes('atorvas')) return 'Atorvastatin';
+            
+            // กรณีชื่อแปลกๆ ให้ตัดตัวเลขความแรงและหน่วยทิ้งไปเลย
+            let base = name.replace(/\s*\d+(?:\.\d+)?\s*(mg|ml|g|mcg|mEq|%|tab|cap|amp|vial|tablet|capsule).*$/i, '').trim();
+            return base.charAt(0).toUpperCase() + base.slice(1);
         }
 
         function highlightText(text, extractedDrugs) {
             if (!text) return '-';
             let highlighted = text;
-            
-            // ขยายขอบเขตการไฮไลท์ให้ครอบคลุม Key ใน Dictionary ด้วย
             let highlightWords = [...extractedDrugs];
             
             extractedDrugs.forEach(drug => {
-                // ค้นหาย้อนกลับว่ายานี้มาจากตัวย่ออะไร แล้วไฮไลท์ตัวย่อนั้นด้วย
                 for (let key in drugDictionary) {
-                    if (drugDictionary[key] === drug) {
-                        highlightWords.push(key);
-                    }
+                    if (drugDictionary[key] === drug) highlightWords.push(key);
                 }
             });
 
-            // ทำการ Replace ทีละคำ (เรียงจากคำยาวไปคำสั้นป้องกันการแทนที่ทับซ้อน)
             highlightWords.sort((a,b) => b.length - a.length).forEach(word => {
-                // ใช้ regex แบบดักหน้าหลัง \b เพื่อไม่ให้ไฮไลท์คำที่อยู่ในคำอื่น
-                // ข้อควรระวัง: คำในภาษาไทยไม่มี Word Boundary (\b) ดังนั้นให้ไฮไลท์กว้างๆ ถ้าเป็นชื่อเฉพาะ
                 let isEnglish = /^[a-zA-Z0-9\s]+$/.test(word);
                 let regexStr = isEnglish ? `\\b(${word})\\b` : `(${word})`;
-                
                 try {
                     const regex = new RegExp(regexStr, 'gi');
                     highlighted = highlighted.replace(regex, `<span class="highlight-drug">$1</span>`);
                 } catch(e) {}
             });
-            
             return highlighted;
         }
 
         // ==========================================
-        // CONFIG Slicers
+        // 2. Data Initialization
         // ==========================================
+        
         const filterFields = {
-            'สถานะ': 'filterStatus',
-            'สถานที่': 'filterLocation',
-            'ระดับ': 'filterLevel',
-            'หน่วยงานที่เกี่ยวข้อง': 'filterDept',
-            'รายการ': 'filterItem',
-            'Phase': 'filterPhase'
+            'สถานะ': 'filterStatus', 'สถานที่': 'filterLocation', 'ระดับ': 'filterLevel',
+            'หน่วยงานที่เกี่ยวข้อง': 'filterDept', 'รายการ': 'filterItem', 'Phase': 'filterPhase'
         };
 
         const tsConfig = { plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'title', searchField: 'title', placeholder: 'ทั้งหมด', onChange: function() { applyFilters(); } };
@@ -311,12 +343,8 @@
                 if (!m) {
                     let p = cleanStr.split(/[-/]/);
                     if (p.length < 3) return null;
-                    let n0 = parseInt(p[0].replace(/\D/g, ''));
-                    let n1 = parseInt(p[1].replace(/\D/g, ''));
-                    let n2 = parseInt(p[2].replace(/\D/g, ''));
-                    if (n0 > 1000) { y = n0; m = n1; d = n2; }
-                    else if (n2 > 1000) { y = n2; m = n1; d = n0; }
-                    else { y = n2; m = n1; d = n0; }
+                    let n0 = parseInt(p[0].replace(/\D/g, '')); let n1 = parseInt(p[1].replace(/\D/g, '')); let n2 = parseInt(p[2].replace(/\D/g, ''));
+                    if (n0 > 1000) { y = n0; m = n1; d = n2; } else if (n2 > 1000) { y = n2; m = n1; d = n0; } else { y = n2; m = n1; d = n0; }
                 }
                 if (y < 100) y += 2500; else if (y >= 1900 && y <= 2100) y += 543; else if (y > 3000) y -= 543; 
                 return { strCE: `${y - 543}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`, intBE: (y * 10000) + (m * 100) + d, year: y, month: m, day: d };
@@ -340,23 +368,21 @@
                         row._dateObj = row['วันที่เกิดเหตุ'] ? normalizeDate(row['วันที่เกิดเหตุ']) : null;
                         let rawLvl = String(row['ระดับ'] || '').trim().toUpperCase();
                         row._level = rawLvl !== '' ? rawLvl : 'ไม่ระบุ';
-                        
-                        // 🚀 รัน NLP-Lite Extractor ตอนโหลดไฟล์
                         row._extractedDrugs = extractDrugs(row['รายละเอียด']);
+                        
+                        // แปะ Base Drug ไว้ด้วยเลยเพื่อง่ายต่อการคำนวณกราฟ
+                        row._baseDrugs = [...new Set(row._extractedDrugs.map(d => getBaseDrugName(d)))];
                         
                         return row;
                     }).filter(row => row._dateObj !== null);
 
                     if (rawData.length > 0) {
                         currentFilteredData = [...rawData];
-                        currentTableData = [...rawData];
                         initDateRange();
                         initSlicers();
                         document.getElementById('welcomeScreen').style.display = 'none';
                         document.getElementById('mainDashboard').style.display = 'block';
-                        processData(currentFilteredData);
-                    } else {
-                        alert("ไม่พบข้อมูลที่สมบูรณ์ในไฟล์ CSV หรือไฟล์ผิดรูปแบบ");
+                        clearDrillDown(); // วาดหน้าจอทั้งหมด
                     }
                 }
             });
@@ -406,43 +432,76 @@
                 return true;
             });
             
-            // เวลากรองใหม่ ตารางด้านล่างก็ต้อง Reset เป็นข้อมูลที่กรองแล้วด้วย
-            currentTableData = [...currentFilteredData];
-            processData(currentFilteredData);
+            // รีเซ็ต Drill Down เสมอเมื่อเปลี่ยน Slicer ยักษ์
+            clearDrillDown();
         }
 
-        function processData(data) {
-            const totalFiltered = data.length;
+        // ==========================================
+        // 3. Centralized Dashboard Updater (Cross-Filtering)
+        // ==========================================
+        
+        function triggerDrillDown(type, label) {
+            currentDrillDown = { type: type, label: label };
+            updateDashboard();
+            document.getElementById('activeFilterBar').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function clearDrillDown() {
+            currentDrillDown = null;
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            // 1. กำหนด activeData
+            if (currentDrillDown) {
+                let type = currentDrillDown.type;
+                let label = currentDrillDown.label;
+                let alertText = "";
+                
+                if (type === 'severe') {
+                    activeData = currentFilteredData.filter(r => ['E','F','G','H','I'].includes(r._level));
+                    alertText = "ความคลาดเคลื่อนระดับ E ขึ้นไป";
+                } else if (type === 'errorType') {
+                    activeData = currentFilteredData.filter(r => String(r['รายการ'] || '').trim() === label);
+                    alertText = `ประเภทความคลาดเคลื่อน: ${label}`;
+                } else if (type === 'drug') {
+                    // กรองเฉพาะเคสที่มียา "Base Name" ตรงกับที่คลิก
+                    activeData = currentFilteredData.filter(r => r._baseDrugs.includes(label));
+                    alertText = `กลุ่มยาที่เกี่ยวข้อง: ${label}`;
+                } else {
+                    activeData = [...currentFilteredData];
+                }
+
+                document.getElementById('activeFilterBar').style.display = 'flex';
+                document.getElementById('activeFilterText').innerText = alertText;
+            } else {
+                activeData = [...currentFilteredData];
+                document.getElementById('activeFilterBar').style.display = 'none';
+            }
+
+            // 2. สั่งวาดทุกส่วนบนหน้าจอใหม่ด้วย activeData
+            renderSummaryCards(activeData);
+            renderChartsFromData(activeData);
+            renderInsightReport(activeData);
+            renderNLPTable(activeData);
+        }
+
+        function renderSummaryCards(data) {
+            const total = data.length;
             const severeLevels = ['E', 'F', 'G', 'H', 'I'];
             const severeCount = data.filter(row => severeLevels.includes(row._level)).length;
 
             const itemCounts = {};
             const drugCounts = {}; 
-            const monthCounts = {};
-            
-            // สำหรับหาความสัมพันธ์: ยาชนิดไหน ผิดประเภทใด
-            const relationData = {}; // โครงสร้าง { 'DrugName': { 'Error1': 5, 'Error2': 2 } }
-            const allItemsFound = new Set(); // เก็บ Error Type ทั้งหมดที่สัมพันธ์กับยา
 
             data.forEach(row => {
                 const item = String(row['รายการ'] || '').trim() || 'ไม่ระบุ';
                 itemCounts[item] = (itemCounts[item] || 0) + 1;
 
-                row._extractedDrugs.forEach(drug => {
-                    let dName = drug; // ตอนนี้เป็นชื่อ Standard ที่สวยงามแล้ว
-                    
-                    // นับภาพรวมยา
-                    if (!drugCounts[dName]) drugCounts[dName] = { name: dName, count: 0 };
-                    drugCounts[dName].count += 1;
-                    
-                    // วิเคราะห์ความสัมพันธ์
-                    if (!relationData[dName]) relationData[dName] = {};
-                    relationData[dName][item] = (relationData[dName][item] || 0) + 1;
-                    allItemsFound.add(item);
+                // นับกลุ่มยา Base Name
+                row._baseDrugs.forEach(baseName => {
+                    drugCounts[baseName] = (drugCounts[baseName] || 0) + 1;
                 });
-
-                const mY = `${row._dateObj.year}-${row._dateObj.month.toString().padStart(2, '0')}`;
-                monthCounts[mY] = (monthCounts[mY] || 0) + 1;
             });
 
             const itemKeys = Object.keys(itemCounts).filter(k => k !== 'ไม่ระบุ');
@@ -450,74 +509,104 @@
             const topItemCount = topItem !== '-' ? itemCounts[topItem] : 0;
 
             const drugKeys = Object.keys(drugCounts);
-            let topDrug = '-';
-            let topDrugCount = 0;
-            if (drugKeys.length > 0) {
-                const topDrugKey = drugKeys.reduce((a, b) => drugCounts[a].count > drugCounts[b].count ? a : b);
-                topDrug = drugCounts[topDrugKey].name;
-                topDrugCount = drugCounts[topDrugKey].count;
-            }
+            const topDrug = drugKeys.length > 0 ? drugKeys.reduce((a, b) => drugCounts[a] > drugCounts[b] ? a : b) : '-';
+            const topDrugCount = topDrug !== '-' ? drugCounts[topDrug] : 0;
 
-            document.getElementById('totalIncidents').innerText = totalFiltered.toLocaleString();
+            document.getElementById('totalIncidents').innerText = total.toLocaleString();
             document.getElementById('severeIncidents').innerText = severeCount.toLocaleString();
-            document.getElementById('severePercentMsg').innerText = `คิดเป็น ${totalFiltered ? ((severeCount / totalFiltered) * 100).toFixed(1) : 0}% ในช่วงเวลานี้`;
+            document.getElementById('severePercentMsg').innerText = `คิดเป็น ${total ? ((severeCount / total) * 100).toFixed(1) : 0}% ในช่วงเวลานี้`;
 
             document.getElementById('topError').innerText = topItem;
-            document.getElementById('topErrorMsg').innerText = `จำนวน ${topItemCount} ครั้ง`;
+            document.getElementById('topErrorMsg').innerText = `พบในรายงาน ${topItemCount} ครั้ง`;
+            document.getElementById('topErrorRaw').value = topItem;
 
             document.getElementById('topDrug').innerText = topDrug;
-            document.getElementById('topDrugMsg').innerText = `พบในอุบัติการณ์ ${topDrugCount} ครั้ง`;
+            document.getElementById('topDrugMsg').innerText = `พบในรายงาน ${topDrugCount} ครั้ง`;
+            document.getElementById('topDrugRaw').value = topDrug;
+        }
 
-            // ผูก Event Clickable Cards
-            document.getElementById('severeCard').onclick = () => triggerDrillDown('severe', 'E,F,G,H,I');
-            document.getElementById('topErrorCard').onclick = () => triggerDrillDown('errorType', topItem);
-            document.getElementById('topDrugCard').onclick = () => triggerDrillDown('drug', topDrug);
+        function renderChartsFromData(data) {
+            const totalFiltered = data.length;
+            const itemCounts = {};
+            const drugCounts = {}; 
+            const monthCounts = {};
+            const relationData = {}; 
+            const allItemsFound = new Set(); 
+
+            data.forEach(row => {
+                const item = String(row['รายการ'] || '').trim() || 'ไม่ระบุ';
+                itemCounts[item] = (itemCounts[item] || 0) + 1;
+
+                row._baseDrugs.forEach(baseName => {
+                    drugCounts[baseName] = (drugCounts[baseName] || 0) + 1;
+                    if (!relationData[baseName]) relationData[baseName] = {};
+                    relationData[baseName][item] = (relationData[baseName][item] || 0) + 1;
+                    allItemsFound.add(item);
+                });
+
+                const mY = `${row._dateObj.year}-${row._dateObj.month.toString().padStart(2, '0')}`;
+                monthCounts[mY] = (monthCounts[mY] || 0) + 1;
+            });
 
             // กราฟ 1: Top 10 Error Types
             const sortedItems = Object.keys(itemCounts).sort((a,b) => itemCounts[b]-itemCounts[a]).slice(0, 10);
             const itemData = sortedItems.map(k => itemCounts[k]);
             renderChart('errorTypeChart', 'bar', sortedItems, itemData, '#6366f1', true, 'errorType', totalFiltered);
 
-            // กราฟ 2: Top 15 Extracted Drugs
-            const sortedDrugs = Object.values(drugCounts).sort((a,b) => b.count - a.count).slice(0, 15);
-            const drugLabels = sortedDrugs.map(d => d.name);
-            const drugData = sortedDrugs.map(d => d.count);
-            renderChart('drugChart', 'bar', drugLabels, drugData, '#10b981', true, 'drug', totalFiltered);
+            // กราฟ 2: Top 15 Generic Drugs
+            const sortedDrugs = Object.keys(drugCounts).sort((a,b) => drugCounts[b] - drugCounts[a]).slice(0, 15);
+            const drugData = sortedDrugs.map(d => drugCounts[d]);
+            renderChart('drugChart', 'bar', sortedDrugs, drugData, '#10b981', true, 'drug', totalFiltered);
             
-            // กราฟ 3: Stacked Bar Chart (ยา x ประเภท Error)
-            renderRelationChart('relationChart', sortedDrugs.map(d=>d.name), relationData, Array.from(allItemsFound));
-
-            // โหลดตาราง
-            document.getElementById('tableTitle').innerText = "ตารางข้อมูลทั้งหมด";
-            renderNLPTable(currentTableData);
+            // กราฟ 3: Stacked Bar Chart
+            renderRelationChart('relationChart', sortedDrugs, relationData, Array.from(allItemsFound));
         }
 
-        // --- กราฟแสดงความสัมพันธ์ ยา กับ Error Type ---
+        function renderChart(canvasId, type, labels, data, color, isHorizontal, filterType, total) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            if (charts[canvasId]) charts[canvasId].destroy();
+
+            charts[canvasId] = new Chart(ctx, {
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: [{ data: data, backgroundColor: color + 'CC', borderColor: color, borderWidth: 1, borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    indexAxis: isHorizontal ? 'y' : 'x',
+                    plugins: { 
+                        legend: { display: false }, 
+                        tooltip: { 
+                            callbacks: { 
+                                label: function(c) { return ` ${c.raw} ครั้ง (${total ? ((c.raw/total)*100).toFixed(1) : 0}%)`; } 
+                            } 
+                        } 
+                    },
+                    onClick: (e, el) => { if(el.length > 0) triggerDrillDown(filterType, labels[el[0].index]); }
+                }
+            });
+        }
+
         function renderRelationChart(canvasId, topDrugsList, relationData, allItemsFound) {
             const ctx = document.getElementById(canvasId).getContext('2d');
             if (charts[canvasId]) charts[canvasId].destroy();
 
-            // สร้างชุดสีจำลอง สำหรับแต่ละ Error Type
             const colorPalette = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e'];
             
             const datasets = [];
-            // วนลูปสร้าง Dataset ตามจำนวน Error Type ทั้งหมดที่ค้นพบ
             allItemsFound.forEach((item, index) => {
                 let dataForThisItem = [];
                 let hasData = false;
-
                 topDrugsList.forEach(drug => {
                     let count = (relationData[drug] && relationData[drug][item]) ? relationData[drug][item] : 0;
                     dataForThisItem.push(count);
                     if(count > 0) hasData = true;
                 });
-
-                // ใส่มาเฉพาะ Type ที่มียอดสะสมในกลุ่ม Top 15 Drugs
                 if (hasData) {
                     datasets.push({
-                        label: item,
-                        data: dataForThisItem,
-                        backgroundColor: colorPalette[index % colorPalette.length] + 'E6', // ความทึบ 90%
+                        label: item, data: dataForThisItem,
+                        backgroundColor: colorPalette[index % colorPalette.length] + 'E6',
                         borderWidth: 0
                     });
                 }
@@ -525,36 +614,77 @@
 
             charts[canvasId] = new Chart(ctx, {
                 type: 'bar',
-                data: {
-                    labels: topDrugsList,
-                    datasets: datasets
-                },
+                data: { labels: topDrugsList, datasets: datasets },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
-                    indexAxis: 'y', // แนวนอน
-                    scales: {
-                        x: { stacked: true },
-                        y: { stacked: true }
-                    },
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                    scales: { x: { stacked: true }, y: { stacked: true } },
                     plugins: {
                         legend: { display: true, position: 'right', labels: { boxWidth: 12, font: { size: 10 } } },
                         tooltip: { mode: 'index', intersect: false }
                     },
-                    onClick: (e, el) => { 
-                        if(el.length > 0) {
-                            let drugName = topDrugsList[el[0].index];
-                            triggerDrillDown('drug', drugName);
-                        }
-                    }
+                    onClick: (e, el) => { if(el.length > 0) triggerDrillDown('drug', topDrugsList[el[0].index]); }
                 }
             });
         }
 
-        // --- NLP-Lite Extractor Table ---
+        // ==========================================
+        // 4. Insight Report & NLP Tables
+        // ==========================================
+        
+        function renderInsightReport(data) {
+            if (insightTableInstance) insightTableInstance.destroy();
+            
+            let insightData = {};
+            let totalEvents = data.length;
+
+            data.forEach(r => {
+                let item = String(r['รายการ'] || '').trim() || 'ไม่ระบุ';
+                
+                if (r._baseDrugs.length === 0) {
+                    let key = 'ไม่พบชื่อยา|||' + item;
+                    if (!insightData[key]) insightData[key] = { baseDrug: 'ไม่พบชื่อยา (ตรวจสอบในตารางล่าง)', item: item, count: 0 };
+                    insightData[key].count++;
+                } else {
+                    r._baseDrugs.forEach(baseDrug => {
+                        let key = baseDrug + '|||' + item;
+                        if (!insightData[key]) insightData[key] = { baseDrug, item, count: 0 };
+                        insightData[key].count++;
+                    });
+                }
+            });
+
+            let sortedInsights = Object.values(insightData).sort((a, b) => b.count - a.count);
+            
+            const body = document.getElementById('insightTableBody');
+            body.innerHTML = '';
+            
+            sortedInsights.forEach(row => {
+                let percent = totalEvents > 0 ? ((row.count / totalEvents) * 100).toFixed(1) : 0;
+                let tr = document.createElement('tr');
+                tr.classList.add('hover:bg-indigo-50');
+                tr.innerHTML = `
+                    <td class="p-2 border font-bold text-gray-700">${row.item}</td>
+                    <td class="p-2 border text-indigo-700 font-semibold">${row.baseDrug}</td>
+                    <td class="p-2 border text-center font-bold text-gray-800">${row.count}</td>
+                    <td class="p-2 border text-center text-gray-500">${percent}%</td>
+                `;
+                body.appendChild(tr);
+            });
+
+            insightTableInstance = $('#insightTable').DataTable({
+                dom: '<"flex flex-col md:flex-row justify-between items-center mb-2"lB>rtip',
+                pageLength: 10,
+                lengthMenu: [[10, 20, 50, -1], ["10 แถว", "20 แถว", "50 แถว", "ทั้งหมด"]],
+                buttons: [
+                    { extend: 'excel', text: '📥 Export Excel สรุปผล', className: 'bg-green-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm' },
+                    { extend: 'print', text: '🖨️ Print รายงาน', className: 'bg-blue-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm' }
+                ],
+                language: { info: "แสดงข้อมูลสรุป _START_ ถึง _END_ จาก _TOTAL_ ความสัมพันธ์" }
+            });
+        }
+
         function renderNLPTable(data) {
-            if (nlpTableInstance) {
-                nlpTableInstance.destroy();
-            }
+            if (nlpTableInstance) nlpTableInstance.destroy();
             
             const body = document.getElementById('nlpTableBody');
             body.innerHTML = '';
@@ -565,6 +695,7 @@
                 const dObj = r._dateObj;
                 const displayDate = dObj ? `${dObj.day.toString().padStart(2,'0')}/${dObj.month.toString().padStart(2,'0')}/${dObj.year}` : r['วันที่เกิดเหตุ'];
                 
+                // ในตาราง NLP โชว์ Specific Name แบบละเอียดเหมือนเดิม!
                 let drugsHtml = r._extractedDrugs.length > 0 
                     ? r._extractedDrugs.map(d => `<span class="inline-block bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-1 rounded-md mb-1 mr-1 shadow-sm font-semibold">${d}</span>`).join('')
                     : `<span class="text-gray-400 italic text-[11px]">ไม่พบชื่อยาภาษาอังกฤษ</span>`;
@@ -590,61 +721,12 @@
                 pageLength: 20,
                 lengthMenu: [[10, 20, 50, 100, -1], ["10 แถว", "20 แถว", "50 แถว", "100 แถว", "ทั้งหมด"]],
                 buttons: [
-                    { extend: 'excel', text: '📥 Export Excel', className: 'bg-emerald-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm hover:bg-emerald-700' },
-                    { extend: 'print', text: '🖨️ Print / PDF', className: 'bg-blue-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm hover:bg-blue-700' }
+                    { extend: 'excel', text: '📥 Export Excel (เจาะลึก)', className: 'bg-emerald-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm' },
+                    { extend: 'print', text: '🖨️ Print ข้อมูล', className: 'bg-blue-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm' }
                 ],
-                language: { search: "🔍 ค้นหา:", info: "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ", lengthMenu: "แสดง _MENU_" }
+                language: { search: "🔍 ค้นหา (พิมพ์ชื่อยาได้เลย):", info: "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ", lengthMenu: "แสดง _MENU_" }
             });
         }
-
-        function renderChart(canvasId, type, labels, data, color, isHorizontal, filterType, total) {
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            if (charts[canvasId]) charts[canvasId].destroy();
-
-            charts[canvasId] = new Chart(ctx, {
-                type: type,
-                data: {
-                    labels: labels,
-                    datasets: [{ data: data, backgroundColor: color + '99', borderColor: color, borderWidth: 1, borderRadius: 4 }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    indexAxis: isHorizontal ? 'y' : 'x',
-                    plugins: { 
-                        legend: { display: false }, 
-                        tooltip: { 
-                            callbacks: { 
-                                label: function(c) { return ` ${c.raw} ครั้ง`; } 
-                            } 
-                        } 
-                    },
-                    onClick: (e, el) => { if(el.length > 0) triggerDrillDown(filterType, labels[el[0].index]); }
-                }
-            });
-        }
-
-        // --- ระบบ Drill-down กรองตาราง NLP ข้างล่าง ---
-        function triggerDrillDown(type, label) {
-            if (label === '-' || type === 'all') {
-                currentTableData = [...currentFilteredData];
-                document.getElementById('tableTitle').innerText = "ตารางข้อมูลทั้งหมด";
-            } else if (type === 'severe') {
-                currentTableData = currentFilteredData.filter(r => ['E','F','G','H','I'].includes(r._level));
-                document.getElementById('tableTitle').innerText = "รายละเอียด: ความคลาดเคลื่อนระดับ E ขึ้นไป";
-            } else if (type === 'errorType') {
-                currentTableData = currentFilteredData.filter(r => String(r['รายการ'] || '').trim() === label);
-                document.getElementById('tableTitle').innerText = "รายละเอียดประเภท: " + label;
-            } else if (type === 'drug') {
-                // กรองเฉพาะเคสที่มียาตัวที่คลิก (เทียบด้วย Strict Mode เพื่อไม่ให้เจอคำที่ซ้อนกัน)
-                currentTableData = currentFilteredData.filter(r => r._extractedDrugs.includes(label));
-                document.getElementById('tableTitle').innerText = "รายละเอียดเกี่ยวกับยา: " + label;
-            }
-
-            renderNLPTable(currentTableData);
-            document.getElementById('nlpSection').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function resetFilters() { initDateRange(); for(let k in tomSelects) tomSelects[k].clear(true); applyFilters(); }
     </script>
 </body>
 </html>
