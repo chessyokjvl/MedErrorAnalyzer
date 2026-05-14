@@ -67,9 +67,9 @@
             <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-6 max-w-3xl mx-auto mb-8 text-left">
                 <h3 class="text-emerald-800 font-bold mb-2 flex items-center gap-2">✨ อัปเดตล่าสุด: Personnel Mapping & Smart Run Charts</h3>
                 <ul class="list-disc list-inside text-gray-700 space-y-2 text-sm md:text-base">
-                    <li>ระบบสามารถรวมกลุ่ม <b>บุคลากรที่ประสบเหตุ</b> (เช่น ณภปฤณ = กนกนภัส) อัตโนมัติ</li>
+                    <li>ระบบสามารถรวมกลุ่ม <b>บุคลากรที่ประสบเหตุ</b> อัตโนมัติ</li>
                     <li>กราฟ Run Chart แสดงเฉพาะข้อมูลตั้งแต่ ต.ค. 2562 เป็นต้นไป</li>
-                    <li>แก้ไขปัญหา Failsafe ป้องกัน Error ข้อมูลว่างเปล่าเวลา Import ไฟล์</li>
+                    <li>แก้ไขปัญหา Slicers หาย พร้อมเพิ่มกล่อง <b>หน่วยงานที่เกี่ยวข้อง</b> ให้ครบถ้วน</li>
                 </ul>
             </div>
             <div class="flex flex-col md:flex-row justify-center gap-4">
@@ -107,21 +107,27 @@
                     <h3 class="font-bold text-gray-700 flex items-center gap-2">ตัวกรองข้อมูลหลัก (Global Slicers)</h3>
                     <button onclick="resetFilters()" class="text-sm text-emerald-600 hover:text-emerald-800 font-medium bg-emerald-50 px-3 py-1 rounded">ล้างตัวกรองทั้งหมด</button>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-                    <div class="lg:col-span-2 grid grid-cols-2 gap-2">
-                        <div><label class="block text-xs font-medium text-gray-500 mb-1">ตั้งแต่วันที่ (ปฏิทิน ค.ศ.)</label><input type="date" id="startDate" class="w-full border border-gray-200 rounded-lg p-2 text-sm" onchange="applyFilters()"></div>
-                        <div><label class="block text-xs font-medium text-gray-500 mb-1">ถึงวันที่ (ปฏิทิน ค.ศ.)</label><input type="date" id="endDate" class="w-full border border-gray-200 rounded-lg p-2 text-sm" onchange="applyFilters()"></div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-2 gap-2 col-span-1 lg:col-span-2 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">ตั้งแต่วันที่ (ปฏิทิน ค.ศ.)</label><input type="date" id="startDate" class="w-full border border-gray-300 rounded p-1.5 text-sm" onchange="applyFilters()"></div>
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">ถึงวันที่ (ปฏิทิน ค.ศ.)</label><input type="date" id="endDate" class="w-full border border-gray-300 rounded p-1.5 text-sm" onchange="applyFilters()"></div>
+                        <div><label class="block text-xs font-bold text-blue-600 mb-1">ปีงบประมาณ</label><select id="filterFY" multiple placeholder="ทุกปีงบ"></select></div>
+                        <div><label class="block text-xs font-bold text-blue-600 mb-1">ไตรมาส (ปีงบ)</label><select id="filterFQ" multiple placeholder="ทุกไตรมาส"></select></div>
                     </div>
-                    <div><label class="block text-xs font-medium text-blue-600 mb-1">ปีงบประมาณ</label><select id="filterFY" multiple placeholder="ทุกปีงบ"></select></div>
-                    <div><label class="block text-xs font-medium text-blue-600 mb-1">ไตรมาส (ปีงบ)</label><select id="filterFQ" multiple placeholder="ทุกไตรมาส"></select></div>
                     
-                    <div><label class="block text-xs font-medium text-gray-500 mb-1">ระดับความรุนแรง</label><select id="filterLevel" multiple></select></div>
-                    <div><label class="block text-xs font-medium text-gray-500 mb-1">สถานะ</label><select id="filterStatus" multiple></select></div>
-                    
-                    <div class="lg:col-span-2"><label class="block text-xs font-medium text-gray-500 mb-1">ประเภทความคลาดเคลื่อน (รายการ)</label><select id="filterItem" multiple></select></div>
-                    <div class="lg:col-span-2"><label class="block text-xs font-medium text-gray-500 mb-1">บุคลากรที่ประสบเหตุ</label><select id="filterPersonnel" multiple></select></div>
-                    <div><label class="block text-xs font-medium text-gray-500 mb-1">สถานที่</label><select id="filterLocation" multiple></select></div>
-                    <div><label class="block text-xs font-medium text-gray-500 mb-1">Phase</label><select id="filterPhase" multiple></select></div>
+                    <div class="col-span-1 lg:col-span-2 bg-gray-50 p-3 rounded-lg border border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">ระดับความรุนแรง</label><select id="filterLevel" multiple></select></div>
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">สถานะ</label><select id="filterStatus" multiple></select></div>
+                        <div class="sm:col-span-2"><label class="block text-xs font-bold text-gray-600 mb-1">ประเภทความคลาดเคลื่อน (รายการ)</label><select id="filterItem" multiple></select></div>
+                    </div>
+
+                    <div class="col-span-1 lg:col-span-4 bg-gray-50 p-3 rounded-lg border border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">หน่วยงานที่เกี่ยวข้อง</label><select id="filterDept" multiple></select></div>
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">บุคลากรที่ประสบเหตุ</label><select id="filterPersonnel" multiple></select></div>
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">สถานที่</label><select id="filterLocation" multiple></select></div>
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">Phase</label><select id="filterPhase" multiple></select></div>
+                    </div>
                 </div>
             </div>
 
@@ -251,7 +257,7 @@
 
     <script>
         // ==========================================
-        // 🚀 URL ของ Google Apps Script ที่ Deploy ไว้ (อย่าลืม New Deployment)
+        // 🚀 URL ของ Google Apps Script ที่ Deploy ไว้
         // ==========================================
         const GAS_URL = "https://script.google.com/macros/s/AKfycbxc0Xk_LTKAJ84QkvdckyjJE6-iR6eTZz9CVvqBqYAkYM6YYlcu395_qHGQApVFTgE/exec";
 
@@ -271,7 +277,6 @@
         let insightTableInstance = null;
         let tomSelects = {}; 
 
-        // ดักจับ Enter สำหรับ Login
         document.getElementById('username').addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('password').focus(); } });
         document.getElementById('password').addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); executeLogin(); } });
         
@@ -327,7 +332,7 @@
         function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ"; document.getElementById('btnLogin').disabled = false; }
 
         // ==========================================
-        // 1. NLP-Lite Extractor & Normalization
+        // 1. NLP-Lite Extractor
         // ==========================================
         const stopwords = ['ipd', 'opd', 'med', 'medsheet', 'sheet', 'stat', 'prn', 'and', 'the', 'for', 'home', 'ward', 'doctor', 'nurse', 'pharmacy', 'error', 'type', 'order', 'iv', 'im', 'po', 'pc', 'ac', 'hs', 'od', 'bid', 'tid', 'qid', 'sig', 'tab', 'cap', 'mg', 'ml', 'g', 'hold', 'ect', 'robot', 'tray', 'sts', 'lai', 'admit', 'drug', 'profile', 'mar', 'off', 'oral', 'acid', 'inj', 'injection', 'syr', 'syrup', 'tablet', 'capsule'];
         const drugDictionary = {'a2': 'Trihexyphenidyl 2 mg', 'benz2': 'Trihexyphenidyl 2 mg', 'benzhexol2': 'Trihexyphenidyl 2 mg', 'aca': 'Trihexyphenidyl', 'trihex': 'Trihexyphenidyl', 'a5': 'Trihexyphenidyl 5 mg', 'benz5': 'Trihexyphenidyl 5 mg', 'benzhexol5': 'Trihexyphenidyl 5 mg', 'ris': 'Risperidone', 'ris1': 'Risperidone 1 mg', 'ris2': 'Risperidone 2 mg', 'valium': 'Diazepam 10 mg injection', 'dzp': 'Diazepam', 'dpz': 'Diazepam', 'd2': 'Diazepam 2 mg', 'd5': 'Diazepam 5 mg', 'd10': 'Diazepam 10 mg', 'halo': 'Haloperidol', 'halo dec': 'Haloperidol Decanoate', 'halodec': 'Haloperidol Decanoate', 'vpa': 'Sodium Valproate', 'sod val': 'Sodium Valproate', 'sodval': 'Sodium Valproate', 'veltila': 'Sodium Valproate 500 mg', 'depakin': 'Sodium Valproate', 'dep cr': 'Sodium Valproate', 'dcf': 'Diclofenac', 'vitamin b1': 'Vitamin B1', 'vit b1': 'Vitamin B1', 'vitb1': 'Vitamin B1', 'thiamine': 'Vitamin B1', 'amlo': 'Amlodipine', 'atorvas': 'Atorvastatin', 'cpz': 'Chlorpromazine', 'lora': 'Lorazepam', 't5': 'Clorazepate 5 mg', 'tranxene': 'Clorazepate 5 mg', 'ritalin': 'Methylphenidate', 'rubifen': 'Methylphenidate', 'concertra': 'Methylphenidate', 'clozapine': 'Clozapine', 'mianserin': 'Mianserin', 'nortriptyline': 'Nortriptyline', 'amitriptyline': 'Amitriptyline', 'trazodone': 'Trazodone', 'quetiapine': 'Quetiapine', 'folic acid': 'Folic acid', 'folic': 'Folic acid'};
@@ -391,12 +396,11 @@
             return highlighted;
         }
 
-        // ระบบ Normalization ของบุคคล
         function normalizePersonnel(name) {
             if (!name) return 'ไม่ระบุ';
             let n = name.toString().trim();
             n = n.replace(/^(นาย|นางสาว|น\.ส\.|นาง|ภก\.|ภญ\.|เภสัชกร)\s*/i, '');
-            n = n.split(' ')[0]; // เอาเฉพาะชื่อจริง
+            n = n.split(' ')[0]; 
             if (n === 'ณภปฤณ') return 'กนกนภัส';
             if (n === 'พิชิตพงษ์' || n === 'พิชญ์พงศ์') return 'พิชญ์พงศ์';
             const cores = ['ชื่นนภา', 'พิชญ์พงศ์', 'กนกนภัส', 'วนัสภรณ์', 'ประภารัตน์', 'ณัฐหทัย', 'มินตรา', 'นฤมล', 'วุฒิไกร'];
@@ -404,7 +408,12 @@
             return n;
         }
 
+        // ==========================================
+        // 2. Data Initialization & Filtering
+        // ==========================================
+        // 🚀 แก้ไข: เพิ่ม filterDept กลับเข้าไป
         const filterFields = { 'บุคลากรที่ประสบเหตุ': 'filterPersonnel', 'ปีงบประมาณ': 'filterFY', 'ไตรมาส': 'filterFQ', 'สถานะ': 'filterStatus', 'สถานที่': 'filterLocation', 'ระดับ': 'filterLevel', 'หน่วยงานที่เกี่ยวข้อง': 'filterDept', 'รายการ': 'filterItem', 'Phase': 'filterPhase' };
+        
         const tsConfig = { plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'title', searchField: 'title', placeholder: 'ทั้งหมด', onChange: function() { applyFilters(); } };
         const thaiMonthsShort = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
         const thaiMonthsFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
@@ -415,12 +424,9 @@
                 let cleanStr = dateStr.toString().trim().split(' ')[0];
                 let y, m, d;
                 
-                // ดักจับ Excel Serial Number (เช่น 45573)
                 if (/^\d{5}$/.test(cleanStr)) {
                     let excelDate = new Date(Math.round((cleanStr - 25569) * 86400 * 1000));
-                    y = excelDate.getFullYear() + 543;
-                    m = excelDate.getMonth() + 1;
-                    d = excelDate.getDate();
+                    y = excelDate.getFullYear() + 543; m = excelDate.getMonth() + 1; d = excelDate.getDate();
                 } else {
                     let foundThaiMonth = false;
                     for (let i = 0; i < 12; i++) {
@@ -493,6 +499,9 @@
 
         function initSlicers() {
             for (const [colName, elementId] of Object.entries(filterFields)) {
+                let el = document.getElementById(elementId);
+                if (!el) continue; // 🛡️ Failsafe กันพังถ้าหน้า HTML ไม่มีกล่องนี้
+
                 let uniqueValues = [...new Set(rawData.map(item => {
                     if (colName === 'ระดับ') return item._level;
                     if (colName === 'ปีงบประมาณ') return item._dateObj.fy;
@@ -769,7 +778,7 @@
             [...data].sort((a,b) => b._dateObj.intBE - a._dateObj.intBE).forEach(r => {
                 const displayDate = r._dateObj ? `${r._dateObj.day.toString().padStart(2,'0')}/${r._dateObj.month.toString().padStart(2,'0')}/${r._dateObj.year}` : r['วันที่เกิดเหตุ'];
                 let drugsHtml = r._extractedDrugs.length > 0 ? r._extractedDrugs.map(d => `<span class="inline-block bg-emerald-100 text-emerald-800 px-2 rounded mb-1 mr-1">${d}</span>`).join('') : `-`;
-                let tr = document.createElement('tr'); tr.innerHTML = `<td class="p-2 border text-center whitespace-nowrap">${displayDate}</td><td class="p-2 border text-center font-bold">${r._level}</td><td class="p-2 border text-gray-700"><span class="font-bold">${r['รายการ']}</span><br><span class="text-[10px] text-gray-400">${r['สถานที่']}</span><br><span class="text-[10px] text-fuchsia-600 font-bold">${r._personnel}</span></td><td class="p-2 border">${drugsHtml}</td><td class="p-3 border text-gray-600 text-[13px]">[${r['เลขที่ใบความเสี่ยง']}] ${highlightText(r['รายละเอียด'], r._extractedDrugs)}</td>`;
+                let tr = document.createElement('tr'); tr.innerHTML = `<td class="p-2 border text-center">${displayDate}</td><td class="p-2 border text-center font-bold">${r._level}</td><td class="p-2 border text-gray-700"><span class="font-bold">${r['รายการ']}</span><br><span class="text-[10px] text-gray-400">${r['สถานที่']}</span><br><span class="text-[10px] text-fuchsia-600 font-bold">${r._personnel}</span></td><td class="p-2 border">${drugsHtml}</td><td class="p-3 border text-gray-600 text-[13px]">[${r['เลขที่ใบความเสี่ยง']}] ${highlightText(r['รายละเอียด'], r._extractedDrugs)}</td>`;
                 body.appendChild(tr);
             });
             nlpTableInstance = $('#nlpTable').DataTable({ dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"l<"flex"Bf>>rtip', pageLength: 10, buttons: ['excel', 'print'] });
