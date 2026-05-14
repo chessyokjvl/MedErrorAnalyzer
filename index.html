@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
@@ -23,6 +24,7 @@
         body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; display: flex; flex-direction: column; min-height: 100vh; }
         .chart-container { position: relative; height: 300px; width: 100%; cursor: pointer; }
         .chart-container-large { position: relative; height: 400px; width: 100%; cursor: pointer; }
+        .chart-container-run { position: relative; height: 250px; width: 100%; }
         .dataTables_wrapper .dataTables_filter input { border: 1px solid #cbd5e1; border-radius: 0.375rem; padding: 0.25rem 0.5rem; margin-left: 0.5rem; outline: none; }
         .ts-control { border-radius: 0.5rem; border-color: #e2e8f0; padding: 0.5rem; font-size: 0.875rem; }
         .ts-wrapper.multi .ts-control > div { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-radius: 0.25rem; }
@@ -30,33 +32,56 @@
         .card-clickable:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         .highlight-drug { background-color: #fef08a; font-weight: 600; color: #166534; padding: 0 4px; border-radius: 4px; }
         table.dataTable thead .sorting, table.dataTable thead .sorting_asc, table.dataTable thead .sorting_desc { cursor: pointer; }
+        #loginModal { background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
     </style>
 </head>
-<body class="p-6 flex flex-col">
+<body class="p-6 flex flex-col relative">
+
+    <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+            <div class="text-center mb-6">
+                <div class="text-5xl mb-2">🏥</div>
+                <h2 class="text-2xl font-bold text-gray-800">เข้าสู่ระบบ JVL Database</h2>
+                <p class="text-gray-500 text-sm mt-1">เชื่อมต่อฐานข้อมูล Google Sheets อัตโนมัติ</p>
+            </div>
+            <div class="space-y-4">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Username</label><input type="text" id="username" class="w-full border border-gray-300 rounded-lg p-3"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Password</label><input type="password" id="password" class="w-full border border-gray-300 rounded-lg p-3"></div>
+                <div id="loginError" class="text-red-500 text-sm hidden font-medium text-center"></div>
+                <button onclick="executeLogin()" id="btnLogin" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg hover:bg-emerald-700 shadow-md">เข้าสู่ระบบ</button>
+                <button onclick="closeLoginModal()" class="w-full bg-gray-100 text-gray-600 font-bold py-3 rounded-lg hover:bg-gray-200">ยกเลิก</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="fixed inset-0 z-[60] bg-white bg-opacity-90 flex flex-col items-center justify-center hidden">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-600 mb-4"></div>
+        <h2 class="text-xl font-bold text-gray-800">กำลังประมวลผลข้อมูล...</h2>
+        <p class="text-gray-500">ระบบ AI กำลังวิเคราะห์ข้อมูล กรุณารอสักครู่</p>
+    </div>
 
     <main class="max-w-7xl mx-auto space-y-4 w-full">
         
-        <div id="welcomeScreen" class="bg-white p-10 md:p-16 rounded-2xl shadow-sm border border-gray-100 text-center my-10 transition-all">
+        <div id="welcomeScreen" class="bg-white p-10 md:p-16 rounded-2xl shadow-sm border border-gray-100 text-center my-10">
             <div class="text-7xl mb-6">💊</div>
             <h1 class="text-3xl font-bold text-gray-800 mb-4">Medication Error NLP Analyzer</h1>
             <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-6 max-w-3xl mx-auto mb-8 text-left">
-                <h3 class="text-emerald-800 font-bold mb-2 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                    ระบบประมวลผล KPI และ NLP ระบบยา
-                </h3>
+                <h3 class="text-emerald-800 font-bold mb-2 flex items-center gap-2">✨ อัปเดตใหม่: Executive Run Charts</h3>
                 <ul class="list-disc list-inside text-gray-700 space-y-2 text-sm md:text-base">
-                    <li>จัดกลุ่มชื่อยาและสกัดความแรงอัตโนมัติ (NLP-Lite Extractor)</li>
-                    <li>รองรับการคำนวณ KPI อุบัติการณ์ทางยา (Prescribing ถึง Administration)</li>
-                    <li>คำนวณอัตราต่อ 1,000 ใบสั่งยา (OPD) และ 1,000 วันนอน (IPD) ให้อัตโนมัติ</li>
-                    <li>วิธีใช้ : ดึงรายงานเทพ จากระบบบริหารความเสี่ยง JVL RM (เฉพาะหมวดระบบยา) กด Export to Excel<br>
-                        เปิดไฟล์ที่ได้ (God_Report) ด้วย Excel กด Save as ให้เป็นไฟล์ประเภท CSV (UTF-8 Comma Delimited) <br>
-                        นำมา Uploard เข้าระบบวิเคราะห์โดยกดปุ่มสีเขียวด้านล่างนี้</li>
+                    <li>รองรับระบบ <b>ปีงบประมาณและไตรมาส</b> อย่างสมบูรณ์แบบ</li>
+                    <li>เพิ่มกราฟ Run Chart แสดงแนวโน้ม KPI รายเดือนแบบมีเส้นเป้าหมายกำกับ</li>
+                    <li>ตาราง KPI คลิกเพื่อ Drill-down เจาะลึกถึงเคสจริงได้ทันที</li>
                 </ul>
             </div>
-            <label class="inline-block bg-emerald-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-emerald-700 cursor-pointer transition shadow-md">
-                <span class="flex items-center gap-2 text-lg">คลิกเพื่อ Import ไฟล์ CSV ระบบยา</span>
-                <input type="file" id="csvFileMain" accept=".csv" class="hidden" />
-            </label>
+            <div class="flex flex-col md:flex-row justify-center gap-4">
+                <button onclick="openLoginModal()" class="flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-blue-700 shadow-md">
+                    เชื่อมต่อฐานข้อมูล JVL (Login)
+                </button>
+                <label class="flex items-center justify-center gap-2 bg-emerald-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-emerald-700 cursor-pointer shadow-md">
+                    Import ไฟล์ CSV (Standalone)
+                    <input type="file" id="csvFileMain" accept=".csv" class="hidden" />
+                </label>
+            </div>
         </div>
 
         <div id="mainDashboard" style="display: none;" class="space-y-4">
@@ -64,12 +89,18 @@
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800">💊 Medication Error NLP Analyzer</h1>
-                    <p class="text-gray-500 text-sm">ระบบวิเคราะห์และสกัดข้อมูลความคลาดเคลื่อนทางยาเชิงลึก & KPI Tracking</p>
+                    <p class="text-gray-500 text-sm flex items-center gap-2">
+                        <span id="systemModeBadge" class="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">MODE</span>
+                        ระบบวิเคราะห์และสกัดข้อมูลความคลาดเคลื่อนทางยา & KPI Tracking
+                    </p>
                 </div>
-                <label class="cursor-pointer bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-5 py-2.5 rounded-xl text-sm font-semibold transition border border-emerald-200 shadow-sm flex items-center gap-2">
-                    <span id="headerFileName">เปลี่ยนไฟล์ CSV</span>
-                    <input type="file" id="csvFileHeader" accept=".csv" class="hidden" />
-                </label>
+                <div id="headerActions" class="flex gap-2">
+                    <label id="btnChangeCSV" class="cursor-pointer bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-4 py-2 rounded-lg text-sm font-semibold transition border border-emerald-200 shadow-sm flex items-center gap-2">
+                        <span id="headerFileName">เปลี่ยนไฟล์ CSV</span>
+                        <input type="file" id="csvFileHeader" accept=".csv" class="hidden" />
+                    </label>
+                    <button onclick="location.reload()" class="bg-gray-50 text-gray-600 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 shadow-sm">ออกจากระบบ</button>
+                </div>
             </div>
 
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -77,17 +108,20 @@
                     <h3 class="font-bold text-gray-700 flex items-center gap-2">ตัวกรองข้อมูลหลัก (Global Slicers)</h3>
                     <button onclick="resetFilters()" class="text-sm text-emerald-600 hover:text-emerald-800 font-medium bg-emerald-50 px-3 py-1 rounded">ล้างตัวกรองทั้งหมด</button>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     <div class="lg:col-span-2 grid grid-cols-2 gap-2">
                         <div><label class="block text-xs font-medium text-gray-500 mb-1">ตั้งแต่วันที่</label><input type="date" id="startDate" class="w-full border border-gray-200 rounded-lg p-2 text-sm" onchange="applyFilters()"></div>
                         <div><label class="block text-xs font-medium text-gray-500 mb-1">ถึงวันที่</label><input type="date" id="endDate" class="w-full border border-gray-200 rounded-lg p-2 text-sm" onchange="applyFilters()"></div>
                     </div>
-                    <div><label class="block text-xs font-medium text-gray-500 mb-1">ระดับความรุนแรง</label><select id="filterLevel" multiple></select></div>
-                    <div class="lg:col-span-2"><label class="block text-xs font-medium text-gray-500 mb-1">ประเภทความคลาดเคลื่อน (รายการ)</label><select id="filterItem" multiple></select></div>
+                    <div><label class="block text-xs font-medium text-blue-600 mb-1">ปีงบประมาณ</label><select id="filterFY" multiple placeholder="ทุกปีงบ"></select></div>
+                    <div><label class="block text-xs font-medium text-blue-600 mb-1">ไตรมาส (ปีงบ)</label><select id="filterFQ" multiple placeholder="ทุกไตรมาส"></select></div>
                     
+                    <div><label class="block text-xs font-medium text-gray-500 mb-1">ระดับความรุนแรง</label><select id="filterLevel" multiple></select></div>
+                    <div><label class="block text-xs font-medium text-gray-500 mb-1">สถานะ</label><select id="filterStatus" multiple></select></div>
+                    
+                    <div class="lg:col-span-2"><label class="block text-xs font-medium text-gray-500 mb-1">ประเภทความคลาดเคลื่อน (รายการ)</label><select id="filterItem" multiple></select></div>
                     <div class="lg:col-span-2"><label class="block text-xs font-medium text-gray-500 mb-1">หน่วยงานที่เกี่ยวข้อง</label><select id="filterDept" multiple></select></div>
                     <div><label class="block text-xs font-medium text-gray-500 mb-1">สถานที่</label><select id="filterLocation" multiple></select></div>
-                    <div><label class="block text-xs font-medium text-gray-500 mb-1">สถานะ</label><select id="filterStatus" multiple></select></div>
                     <div><label class="block text-xs font-medium text-gray-500 mb-1">Phase</label><select id="filterPhase" multiple></select></div>
                 </div>
             </div>
@@ -95,12 +129,10 @@
             <div id="activeFilterBar" style="display: none;" class="bg-blue-600 text-white p-3 rounded-xl flex flex-col md:flex-row justify-between items-center shadow-md animate-pulse">
                 <div class="flex items-center gap-2 mb-2 md:mb-0">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                    <span class="font-bold">ข้อมูลกำลังถูกกรองลึกโดย:</span> 
+                    <span class="font-bold">ข้อมูลกำลังถูกเจาะลึกโดย:</span> 
                     <span id="activeFilterText" class="font-medium bg-blue-800 px-3 py-1 rounded-lg text-sm">...</span>
                 </div>
-                <button onclick="clearDrillDown()" class="bg-white text-blue-700 px-4 py-1.5 rounded-lg font-bold text-sm hover:bg-blue-50 transition shadow-sm w-full md:w-auto">
-                    ✕ ยกเลิกการกรอง (ดูภาพรวม)
-                </button>
+                <button onclick="clearDrillDown()" class="bg-white text-blue-700 px-4 py-1.5 rounded-lg font-bold text-sm hover:bg-blue-50 transition shadow-sm w-full md:w-auto">✕ ยกเลิกการเจาะลึก (ดูภาพรวม)</button>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="summaryCards">
@@ -109,25 +141,25 @@
                     <p class="text-3xl font-bold text-gray-800 mt-1" id="totalIncidents">0</p>
                     <p class="text-xs text-emerald-500 mt-1 font-medium" id="totalPercentMsg"></p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-red-100 border-l-4 border-l-red-500 card-clickable" id="severeCard">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-red-100 border-l-4 border-l-red-500 card-clickable" onclick="triggerDrillDown('severe', 'E,F,G,H,I')">
                     <h3 class="text-gray-500 text-xs font-medium">ระดับ E ขึ้นไป</h3>
                     <p class="text-3xl font-bold text-gray-800 mt-1" id="severeIncidents">0</p>
                     <p class="text-xs text-red-500 mt-1 font-medium" id="severePercentMsg"></p>
-                    <p class="text-[10px] text-gray-400 mt-1">👆 คลิกเพื่อดูตาราง</p>
+                    <p class="text-[10px] text-gray-400 mt-1">👆 คลิกเพื่อเจาะลึก</p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-blue-100 border-l-4 border-l-blue-500 card-clickable" id="topErrorCard">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-blue-100 border-l-4 border-l-blue-500 card-clickable" onclick="triggerDrillDown('errorType', document.getElementById('topErrorRaw').value)">
                     <h3 class="text-gray-500 text-xs font-medium">ประเภทที่ผิดบ่อยสุด</h3>
                     <p class="text-lg font-bold text-blue-700 mt-1 truncate" id="topError">-</p>
                     <p class="text-xs text-blue-500 mt-1 font-medium" id="topErrorMsg"></p>
                     <input type="hidden" id="topErrorRaw" value="">
-                    <p class="text-[10px] text-blue-400 mt-1">👆 คลิกเพื่อดูตาราง</p>
+                    <p class="text-[10px] text-blue-400 mt-1">👆 คลิกเพื่อเจาะลึก</p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-amber-500 card-clickable" id="topDrugCard">
-                    <h3 class="text-gray-500 text-xs font-medium">ยาที่ตรวจพบปัญหามากสุด</h3>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-amber-500 card-clickable" onclick="triggerDrillDown('drug', document.getElementById('topDrugRaw').value)">
+                    <h3 class="text-gray-500 text-xs font-medium">กลุ่มยาที่มีปัญหามากสุด</h3>
                     <p class="text-lg font-bold text-amber-700 mt-1 truncate" id="topDrug">-</p>
                     <p class="text-xs text-amber-600 mt-1 font-medium" id="topDrugMsg"></p>
                     <input type="hidden" id="topDrugRaw" value="">
-                    <p class="text-[10px] text-amber-400 mt-1">👆 คลิกเพื่อดูตาราง</p>
+                    <p class="text-[10px] text-amber-400 mt-1">👆 คลิกเพื่อเจาะลึก</p>
                 </div>
             </div>
 
@@ -135,22 +167,24 @@
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
                     <div class="flex items-center gap-2">
                         <div class="bg-rose-100 p-2 rounded-lg text-rose-700 font-bold">KPI Dashboard</div>
-                        <h3 class="font-bold text-gray-700 text-lg">รายงานเป้าหมายความคลาดเคลื่อนทางยา</h3>
+                        <h3 class="font-bold text-gray-700 text-lg">รายงานเป้าหมายความคลาดเคลื่อนทางยา (คลิกเพื่อเจาะลึก)</h3>
                     </div>
                     <div class="flex flex-col md:flex-row gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
                         <div class="flex items-center gap-2">
-                            <label class="text-sm font-bold text-gray-700">ใบสั่งยา (OPD):</label>
+                            <label class="text-sm font-bold text-gray-700">ปริมาณงานใบสั่งยา (OPD):</label>
                             <input type="number" id="opdVolume" value="1000" class="w-24 border border-gray-300 rounded p-1 text-sm text-center focus:outline-none focus:border-rose-400" oninput="calculateKPIs()">
                         </div>
                         <div class="flex items-center gap-2">
-                            <label class="text-sm font-bold text-gray-700">วันนอน (IPD):</label>
+                            <label class="text-sm font-bold text-gray-700">ปริมาณวันนอน (IPD):</label>
                             <input type="number" id="ipdVolume" value="1000" class="w-24 border border-gray-300 rounded p-1 text-sm text-center focus:outline-none focus:border-rose-400" oninput="calculateKPIs()">
                         </div>
+                        <div id="kpiAutoMsg" class="hidden text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium items-center justify-center">*ดึงยอดจาก Database อัตโนมัติ</div>
+                        <div id="kpiManualMsg" class="text-xs text-rose-500 font-medium items-center flex">*กรณี CSV โปรดกรอกยอดรวมของช่วงเวลาที่กรอง</div>
                     </div>
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left border-collapse">
+                    <table class="w-full text-sm text-left border-collapse" id="kpiTable">
                         <thead>
                             <tr class="bg-rose-50 text-rose-800">
                                 <th class="p-2 border font-bold">รายการ KPI (NRLS)</th>
@@ -163,58 +197,43 @@
                         <tbody id="kpiTableBody"></tbody>
                     </table>
                 </div>
+
+                <div class="mt-6 border-t border-rose-100 pt-6">
+                    <h3 class="font-bold text-rose-800 text-lg mb-4 text-center">📈 แนวโน้มอุบัติการณ์รายเดือน (Run Charts)</h3>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200"><h4 class="font-bold text-sm mb-2 text-center text-gray-700">1. Prescribing Error</h4><div class="chart-container-run"><canvas id="runChart_CPM201"></canvas></div></div>
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200"><h4 class="font-bold text-sm mb-2 text-center text-gray-700">2. Transcribing Error</h4><div class="chart-container-run"><canvas id="runChart_CPM202"></canvas></div></div>
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200"><h4 class="font-bold text-sm mb-2 text-center text-gray-700">3. Pre-Dispensing Error</h4><div class="chart-container-run"><canvas id="runChart_CPM203"></canvas></div></div>
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200"><h4 class="font-bold text-sm mb-2 text-center text-gray-700">4. Dispensing Error</h4><div class="chart-container-run"><canvas id="runChart_CPM204"></canvas></div></div>
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 lg:col-span-2"><h4 class="font-bold text-sm mb-2 text-center text-gray-700">5. Administration Error</h4><div class="chart-container-run"><canvas id="runChart_CPM205"></canvas></div></div>
+                    </div>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4" id="dashboardArea">
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100"><h3 class="font-bold text-gray-700 mb-2 text-xs">ประเภทความคลาดเคลื่อน (Top 10)</h3><div class="chart-container"><canvas id="errorTypeChart"></canvas></div></div>
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100"><h3 class="font-bold text-emerald-700 mb-2 text-xs">💊 กลุ่มยาที่พบปัญหาบ่อยที่สุด (Top 15)</h3><div class="chart-container"><canvas id="drugChart"></canvas></div></div>
-                
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
-                    <div class="flex justify-between items-center mb-2">
-                        <h3 class="font-bold text-indigo-700 text-xs">🔗 ความสัมพันธ์เชิงลึก: กลุ่มยาชนิดใด มักเกิดข้อผิดพลาดประเภทใด (Top 15)</h3>
-                    </div>
+                    <h3 class="font-bold text-indigo-700 text-xs mb-2">🔗 ความสัมพันธ์เชิงลึก: กลุ่มยาชนิดใด มักเกิดข้อผิดพลาดประเภทใด (Top 15)</h3>
                     <div class="chart-container-large"><canvas id="relationChart"></canvas></div>
                 </div>
             </div>
 
             <div class="bg-white p-6 rounded-xl shadow-sm border border-indigo-200 mt-4" id="insightReportSection">
-                <div class="flex items-center gap-2 mb-1">
-                    <div class="bg-indigo-100 p-2 rounded-lg text-indigo-700 font-bold">Insight Report</div>
-                    <h3 class="font-bold text-gray-700 text-lg">ตารางสรุปความสัมพันธ์ (กลุ่มยา x ประเภทความคลาดเคลื่อน)</h3>
-                </div>
-                <p class="text-xs text-indigo-600 mb-4 font-medium">* ตารางนี้จะสรุปความสัมพันธ์ของข้อมูลที่แสดงอยู่บน Dashboard ให้โดยอัตโนมัติ พร้อมสัดส่วนร้อยละ สำหรับนำไปจัดทำรายงาน</p>
+                <div class="flex items-center gap-2 mb-1"><div class="bg-indigo-100 p-2 rounded-lg text-indigo-700 font-bold">Insight Report</div><h3 class="font-bold text-gray-700 text-lg">ตารางสรุปความสัมพันธ์</h3></div>
                 <div class="overflow-x-auto">
                     <table id="insightTable" class="w-full text-sm text-left border-collapse">
-                        <thead>
-                            <tr class="bg-indigo-50 text-indigo-800">
-                                <th class="p-2 border">ประเภทความคลาดเคลื่อน (Error Type)</th>
-                                <th class="p-2 border">กลุ่มยาหลัก (Generic/Base Name)</th>
-                                <th class="p-2 border text-center">จำนวนที่พบ (ครั้ง)</th>
-                                <th class="p-2 border text-center">ร้อยละ (เทียบกับทั้งหมด)</th>
-                            </tr>
-                        </thead>
+                        <thead><tr class="bg-indigo-50 text-indigo-800"><th class="p-2 border">ประเภทความคลาดเคลื่อน (Error Type)</th><th class="p-2 border">กลุ่มยาหลัก (Generic/Base Name)</th><th class="p-2 border text-center">พบ (ครั้ง)</th><th class="p-2 border text-center">ร้อยละ</th></tr></thead>
                         <tbody id="insightTableBody"></tbody>
                     </table>
                 </div>
             </div>
 
             <div class="bg-white p-6 rounded-xl shadow-sm border border-emerald-200 mt-4" id="nlpSection">
-                <div class="flex items-center gap-2 mb-1">
-                    <div class="bg-emerald-100 p-2 rounded-lg text-emerald-700 font-bold">NLP-Lite Extractor</div>
-                    <h3 class="font-bold text-gray-700 text-lg" id="tableTitle">ตารางเจาะลึกความคลาดเคลื่อนทางยา</h3>
-                </div>
-                <p class="text-xs text-emerald-600 mb-4 font-medium">* ตารางนี้แสดงรายละเอียดเชิงลึกและ <b>ความแรงของยาที่เกิดปัญหาจริง (Specific Strengths)</b> ตามที่ถูกสกัดมาจากรายละเอียด</p>
+                <div class="flex items-center gap-2 mb-1"><div class="bg-emerald-100 p-2 rounded-lg text-emerald-700 font-bold">NLP-Lite Extractor</div><h3 class="font-bold text-gray-700 text-lg" id="tableTitle">ตารางเจาะลึกความคลาดเคลื่อนทางยา</h3></div>
                 <div class="overflow-x-auto">
                     <table id="nlpTable" class="w-full text-xs text-left border-collapse">
-                        <thead>
-                            <tr class="bg-emerald-50 text-emerald-800">
-                                <th class="p-2 border whitespace-nowrap text-center">วันที่เกิดเหตุ</th>
-                                <th class="p-2 border text-center">ระดับ</th>
-                                <th class="p-2 border">ประเภท (Error Type)</th>
-                                <th class="p-2 border min-w-[180px]">💊 ยาที่เกี่ยวข้อง (ระบุความแรง)</th>
-                                <th class="p-2 border min-w-[300px]">รายละเอียดเหตุการณ์</th>
-                            </tr>
-                        </thead>
+                        <thead><tr class="bg-emerald-50 text-emerald-800"><th class="p-2 border text-center">วันที่เกิดเหตุ</th><th class="p-2 border text-center">ระดับ</th><th class="p-2 border">ประเภท (Error Type)</th><th class="p-2 border">สถานที่</th><th class="p-2 border min-w-[150px]">💊 ยา (ระบุความแรง)</th><th class="p-2 border min-w-[300px]">รายละเอียดเหตุการณ์</th></tr></thead>
                         <tbody id="nlpTableBody"></tbody>
                     </table>
                 </div>
@@ -223,9 +242,14 @@
         </div>
     </main>
 
-    <footer class="mt-10 mb-4 text-center text-gray-400 text-xs">พัฒนาโดย ภก.พิชญ์พงศ์ คงนาวัง | โรงพยาบาลจิตเวชเลยราชนครินทร์ | พฤษภาคม 2569</footer>
-
     <script>
+        // Register ChartDataLabels plugin
+        Chart.register(ChartDataLabels);
+        Chart.defaults.set('plugins.datalabels', { display: false }); // Default ปิดไว้ ค่อยเปิดเฉพาะ Run Chart
+
+        let appMode = 'CSV'; 
+        let kpiVolumesDB = {}; 
+
         let charts = {};
         let rawData = []; 
         let currentFilteredData = []; 
@@ -239,52 +263,20 @@
         // ==========================================
         // 1. NLP-Lite Extractor & Base Name Grouper
         // ==========================================
-        
-        const stopwords = [
-            'ipd', 'opd', 'med', 'medsheet', 'sheet', 'stat', 'prn', 'and', 'the', 'for', 'home', 'ward', 'doctor', 'nurse', 'pharmacy', 'error', 'type', 'order', 'iv', 'im', 'po', 'pc', 'ac', 'hs', 'od', 'bid', 'tid', 'qid', 'sig', 'tab', 'cap', 'mg', 'ml', 'g',
-            'hold', 'ect', 'robot', 'tray', 'sts', 'lai', 'admit', 'drug', 'profile', 'mar', 'off', 'oral',
-            'acid', 'inj', 'injection', 'syr', 'syrup', 'tablet', 'capsule'
-        ];
-
-        const drugDictionary = {
-            'a2': 'Trihexyphenidyl 2 mg', 'benz2': 'Trihexyphenidyl 2 mg', 'benzhexol2': 'Trihexyphenidyl 2 mg', 'aca': 'Trihexyphenidyl', 'trihex': 'Trihexyphenidyl',
-            'a5': 'Trihexyphenidyl 5 mg', 'benz5': 'Trihexyphenidyl 5 mg', 'benzhexol5': 'Trihexyphenidyl 5 mg',
-            'ris': 'Risperidone', 'ris1': 'Risperidone 1 mg', 'ris2': 'Risperidone 2 mg',
-            'valium': 'Diazepam 10 mg injection', 'dzp': 'Diazepam', 'dpz': 'Diazepam', 'd2': 'Diazepam 2 mg', 'd5': 'Diazepam 5 mg', 'd10': 'Diazepam 10 mg',
-            'halo': 'Haloperidol', 'halo dec': 'Haloperidol Decanoate', 'halodec': 'Haloperidol Decanoate',
-            'vpa': 'Sodium Valproate', 'sod val': 'Sodium Valproate', 'sodval': 'Sodium Valproate', 'veltila': 'Sodium Valproate 500 mg', 'depakin': 'Sodium Valproate', 'dep cr': 'Sodium Valproate',
-            'dcf': 'Diclofenac',
-            'vitamin b1': 'Vitamin B1', 'vit b1': 'Vitamin B1', 'vitb1': 'Vitamin B1', 'thiamine': 'Vitamin B1',
-            'amlo': 'Amlodipine', 'atorvas': 'Atorvastatin', 'cpz': 'Chlorpromazine', 'lora': 'Lorazepam',
-            't5': 'Clorazepate 5 mg', 'tranxene': 'Clorazepate 5 mg',
-            'ritalin': 'Methylphenidate', 'rubifen': 'Methylphenidate', 'concertra': 'Methylphenidate',
-            'clozapine': 'Clozapine', 'mianserin': 'Mianserin', 'nortriptyline': 'Nortriptyline', 'amitriptyline': 'Amitriptyline', 'trazodone': 'Trazodone', 'quetiapine': 'Quetiapine',
-            'folic acid': 'Folic acid', 'folic': 'Folic acid'
-        };
+        const stopwords = ['ipd', 'opd', 'med', 'medsheet', 'sheet', 'stat', 'prn', 'and', 'the', 'for', 'home', 'ward', 'doctor', 'nurse', 'pharmacy', 'error', 'type', 'order', 'iv', 'im', 'po', 'pc', 'ac', 'hs', 'od', 'bid', 'tid', 'qid', 'sig', 'tab', 'cap', 'mg', 'ml', 'g', 'hold', 'ect', 'robot', 'tray', 'sts', 'lai', 'admit', 'drug', 'profile', 'mar', 'off', 'oral', 'acid', 'inj', 'injection', 'syr', 'syrup', 'tablet', 'capsule'];
+        const drugDictionary = {'a2': 'Trihexyphenidyl 2 mg', 'benz2': 'Trihexyphenidyl 2 mg', 'benzhexol2': 'Trihexyphenidyl 2 mg', 'aca': 'Trihexyphenidyl', 'trihex': 'Trihexyphenidyl', 'a5': 'Trihexyphenidyl 5 mg', 'benz5': 'Trihexyphenidyl 5 mg', 'benzhexol5': 'Trihexyphenidyl 5 mg', 'ris': 'Risperidone', 'ris1': 'Risperidone 1 mg', 'ris2': 'Risperidone 2 mg', 'valium': 'Diazepam 10 mg injection', 'dzp': 'Diazepam', 'dpz': 'Diazepam', 'd2': 'Diazepam 2 mg', 'd5': 'Diazepam 5 mg', 'd10': 'Diazepam 10 mg', 'halo': 'Haloperidol', 'halo dec': 'Haloperidol Decanoate', 'halodec': 'Haloperidol Decanoate', 'vpa': 'Sodium Valproate', 'sod val': 'Sodium Valproate', 'sodval': 'Sodium Valproate', 'veltila': 'Sodium Valproate 500 mg', 'depakin': 'Sodium Valproate', 'dep cr': 'Sodium Valproate', 'dcf': 'Diclofenac', 'vitamin b1': 'Vitamin B1', 'vit b1': 'Vitamin B1', 'vitb1': 'Vitamin B1', 'thiamine': 'Vitamin B1', 'amlo': 'Amlodipine', 'atorvas': 'Atorvastatin', 'cpz': 'Chlorpromazine', 'lora': 'Lorazepam', 't5': 'Clorazepate 5 mg', 'tranxene': 'Clorazepate 5 mg', 'ritalin': 'Methylphenidate', 'rubifen': 'Methylphenidate', 'concertra': 'Methylphenidate', 'clozapine': 'Clozapine', 'mianserin': 'Mianserin', 'nortriptyline': 'Nortriptyline', 'amitriptyline': 'Amitriptyline', 'trazodone': 'Trazodone', 'quetiapine': 'Quetiapine', 'folic acid': 'Folic acid', 'folic': 'Folic acid'};
 
         function extractDrugs(text) {
             if (!text) return [];
             let validDrugs = [];
             let textLower = text.toLowerCase();
-
-            for (let key in drugDictionary) {
-                let regex = new RegExp(`\\b${key}\\b`, 'gi');
-                if (regex.test(textLower)) {
-                    validDrugs.push(drugDictionary[key]);
-                }
-            }
-
-            const regexGeneral = /\b[A-Za-z]{3,}(?:-\w+)?(?:\s*\d+(?:\.\d+)?\s*(?:mg|ml|g|mcg|mEq|%|tab|cap|amp|vial))?\b/gi;
-            let matches = text.match(regexGeneral) || [];
-            
+            for (let key in drugDictionary) { if (new RegExp(`\\b${key}\\b`, 'gi').test(textLower)) validDrugs.push(drugDictionary[key]); }
+            let matches = text.match(/\b[A-Za-z]{3,}(?:-\w+)?(?:\s*\d+(?:\.\d+)?\s*(?:mg|ml|g|mcg|mEq|%|tab|cap|amp|vial))?\b/gi) || [];
             matches.forEach(m => {
                 let firstWord = m.trim().split(' ')[0].toLowerCase();
                 if (!stopwords.includes(firstWord)) {
-                    let cleanName = m.trim();
-                    cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-                    
-                    let isDuplicate = validDrugs.some(vd => vd.toLowerCase().includes(firstWord));
-                    if (!isDuplicate) validDrugs.push(cleanName);
+                    let c = m.trim(); c = c.charAt(0).toUpperCase() + c.slice(1);
+                    if (!validDrugs.some(vd => vd.toLowerCase().includes(firstWord))) validDrugs.push(c);
                 }
             });
             return [...new Set(validDrugs)];
@@ -293,7 +285,6 @@
         function getBaseDrugName(name) {
             if (!name) return 'ไม่ระบุ';
             let n = name.toLowerCase();
-            
             if (n.includes('haloperidol decanoate') || n.includes('halo dec') || n.includes('halodec')) return 'Haloperidol Decanoate';
             if (n.includes('haloperidol') || n.includes('halo')) return 'Haloperidol';
             if (n.includes('lorazepam') || n.includes('lora')) return 'Lorazepam';
@@ -317,7 +308,6 @@
             if (n.includes('amlodipine') || n.includes('amlo')) return 'Amlodipine';
             if (n.includes('atorvastatin') || n.includes('atorvas')) return 'Atorvastatin';
             if (n.includes('folic')) return 'Folic acid';
-            
             let base = name.replace(/\s*\d+(?:\.\d+)?\s*(mg|ml|g|mcg|mEq|%|tab|cap|amp|vial|tablet|capsule).*$/i, '').trim();
             return base.charAt(0).toUpperCase() + base.slice(1);
         }
@@ -326,142 +316,121 @@
             if (!text) return '-';
             let highlighted = text;
             let highlightWords = [...extractedDrugs];
-            
-            extractedDrugs.forEach(drug => {
-                for (let key in drugDictionary) {
-                    if (drugDictionary[key] === drug) highlightWords.push(key);
-                }
-            });
-
+            extractedDrugs.forEach(drug => { for (let key in drugDictionary) { if (drugDictionary[key] === drug) highlightWords.push(key); } });
             highlightWords.sort((a,b) => b.length - a.length).forEach(word => {
                 let isEnglish = /^[a-zA-Z0-9\s]+$/.test(word);
                 let regexStr = isEnglish ? `\\b(${word})\\b` : `(${word})`;
-                try {
-                    const regex = new RegExp(regexStr, 'gi');
-                    highlighted = highlighted.replace(regex, `<span class="highlight-drug">$1</span>`);
-                } catch(e) {}
+                try { highlighted = highlighted.replace(new RegExp(regexStr, 'gi'), `<span class="highlight-drug">$1</span>`); } catch(e) {}
             });
             return highlighted;
         }
 
         // ==========================================
-        // 2. NRLS Mapping & Location Logic for KPI
+        // 2. Data Initialization & Fiscal Year Logic
         // ==========================================
-        const nrlsFullDict = {
-            'CPM101': 'แพ้ยาซ้ำ',
-            'CPM102': 'ไม่ปฏิบัติตาม Guideline High Alert Drug',
-            'CPM103': 'ภาวะแทรกซ้อนที่ป้องกันได้จาก High Alert Drug',
-            'CPM104': 'Mis selection of strong potassium',
-            'CPM105': 'แพ้ยา (ยกเว้นแพ้ยาซ้ำ)/ADE ระดับ E ขึ้นไป',
-            'CPM106': 'ไม่ปฏิบัติตาม Guideline Fatal Drug',
-            'CPM107': 'ผู้ป่วยได้รับยาที่มีคู่ยาปฏิกิริยารุนแรง',
-            'CPM201': 'Prescribing Error (สั่งใช้ยา)',
-            'CPM202': 'Transcribing Error (คัดลอกยา)',
-            'CPM203': 'Pre-dispensing Error (จัดเตรียมจ่ายยา)',
-            'CPM204': 'Dispensing Error (จ่ายยา)',
-            'CPM205': 'Administration Error (ให้ยา)',
-            'CPM206': 'ไม่ปฏิบัติตาม Guideline Look-Alike Sound-Alike',
-            'CPM207': 'ผู้ป่วยได้รับยาในกลุ่ม Look-Alike Sound-Alike',
-            'CPM208': 'ไม่ปฏิบัติตามมาตรฐานการใช้ยา (อื่นๆ)',
-            'CPM301': 'ไม่ปฏิบัติตาม Guideline Med Rec',
-            'CPM302': 'ผู้ป่วยไม่ได้รับยาเดิมจากไม่ได้ทำ Med Rec',
-            'CPM303': 'ผู้ป่วยได้รับยาซ้ำซ้อนจากไม่ได้ทำ Med Rec',
-            'CPM304': 'ได้รับยาที่มีปฏิกิริยากันจากไม่ได้ทำ Med Rec',
-            'CPM401': 'ไม่ปฏิบัติตาม Guideline Rational Drug Use',
-            'CPM402': 'การใช้ยาปฏิชีวนะในโรคติดเชื้อทางเดินหายใจฯ',
-            'CPM403': 'การใช้ยาปฏิชีวนะในโรคอุจจาระร่วงเฉียบพลัน',
-            'CPM404': 'การใช้ยาอย่างไม่สมเหตุผล (ยกเว้นยาปฏิชีวนะ)'
-        };
-
-        function getLocationType(loc) {
-            if (!loc) return 'OTHER';
-            if (loc.includes('กระบวนการผู้ป่วยนอก') || loc.includes('ตึกอำนวยการชั้น1')) return 'OPD';
-            if (loc.includes('กระบวนการผู้ป่วยใน') || loc.includes('ตึกผู้ป่วยใน 5 ชั้น')) return 'IPD';
-            return 'OTHER';
-        }
-
-        const filterFields = {
-            'สถานะ': 'filterStatus', 'สถานที่': 'filterLocation', 'ระดับ': 'filterLevel',
-            'หน่วยงานที่เกี่ยวข้อง': 'filterDept', 'รายการ': 'filterItem', 'Phase': 'filterPhase'
-        };
-
+        const filterFields = { 'ปีงบประมาณ': 'filterFY', 'ไตรมาส': 'filterFQ', 'สถานะ': 'filterStatus', 'สถานที่': 'filterLocation', 'ระดับ': 'filterLevel', 'หน่วยงานที่เกี่ยวข้อง': 'filterDept', 'รายการ': 'filterItem', 'Phase': 'filterPhase' };
         const tsConfig = { plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'title', searchField: 'title', placeholder: 'ทั้งหมด', onChange: function() { applyFilters(); } };
-
         const thaiMonthsShort = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-        const thaiMonthsFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-
+        
         function normalizeDate(dateStr) {
             if (!dateStr) return null;
             try {
                 let cleanStr = dateStr.toString().trim().split(' ')[0];
                 let y, m, d;
                 for (let i = 0; i < 12; i++) {
-                    if (cleanStr.includes(thaiMonthsShort[i]) || cleanStr.includes(thaiMonthsFull[i])) {
+                    if (cleanStr.includes(thaiMonthsShort[i]) || cleanStr.includes(["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][i])) {
                         m = i + 1;
-                        let p = cleanStr.replace(thaiMonthsShort[i], '-').replace(thaiMonthsFull[i], '-').split(/[-/]+/);
-                        p = p.filter(v => v !== '');
-                        d = parseInt(p[0].replace(/\D/g, ''));
-                        y = parseInt(p[1].replace(/\D/g, ''));
-                        break;
+                        let p = cleanStr.replace(thaiMonthsShort[i], '-').replace(["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][i], '-').split(/[-/]+/);
+                        p = p.filter(v => v !== ''); d = parseInt(p[0].replace(/\D/g, '')); y = parseInt(p[1].replace(/\D/g, '')); break;
                     }
                 }
                 if (!m) {
-                    let p = cleanStr.split(/[-/]/);
-                    if (p.length < 3) return null;
+                    let p = cleanStr.split(/[-/]/); if (p.length < 3) return null;
                     let n0 = parseInt(p[0].replace(/\D/g, '')); let n1 = parseInt(p[1].replace(/\D/g, '')); let n2 = parseInt(p[2].replace(/\D/g, ''));
                     if (n0 > 1000) { y = n0; m = n1; d = n2; } else if (n2 > 1000) { y = n2; m = n1; d = n0; } else { y = n2; m = n1; d = n0; }
                 }
                 if (y < 100) y += 2500; else if (y >= 1900 && y <= 2100) y += 543; else if (y > 3000) y -= 543; 
-                return { strCE: `${y - 543}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`, intBE: (y * 10000) + (m * 100) + d, year: y, month: m, day: d };
+                
+                // คำนวณ ปีงบประมาณ และ ไตรมาส
+                let fy = y; if(m >= 10) fy += 1;
+                let fq = m >= 10 ? 'Q1' : (m >= 1 && m <= 3 ? 'Q2' : (m >= 4 && m <= 6 ? 'Q3' : 'Q4'));
+
+                return { strCE: `${y - 543}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`, intBE: (y * 10000) + (m * 100) + d, year: y, month: m, day: d, fy: fy.toString(), fq: fq };
             } catch (e) { return null; }
         }
 
-        document.getElementById('csvFileMain').addEventListener('change', handleFileUpload);
-        document.getElementById('csvFileHeader').addEventListener('change', handleFileUpload);
+        // ==========================================
+        // Modal & Fetching
+        // ==========================================
+        function openLoginModal() { document.getElementById('loginModal').classList.remove('hidden'); }
+        function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden'); document.getElementById('loginError').classList.add('hidden'); }
+        function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
+        function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
 
-        function handleFileUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            document.getElementById('headerFileName').innerText = "ไฟล์: " + file.name;
+        function executeLogin() {
+            const u = document.getElementById('username').value; const p = document.getElementById('password').value;
+            if(!u || !p) { document.getElementById('loginError').innerText = "กรุณากรอกให้ครบ"; document.getElementById('loginError').classList.remove('hidden'); return; }
+            document.getElementById('btnLogin').innerText = "กำลังเข้าสู่ระบบ..."; document.getElementById('btnLogin').disabled = true;
+            
+            google.script.run.withSuccessHandler(res => {
+                if(res.success) { closeLoginModal(); loadJVLData(); } 
+                else { document.getElementById('loginError').innerText = res.message; document.getElementById('loginError').classList.remove('hidden'); document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ"; document.getElementById('btnLogin').disabled = false; }
+            }).checkLogin(u, p);
+        }
 
+        function loadJVLData() {
+            showLoading();
+            google.script.run.withSuccessHandler(res => {
+                appMode = 'JVL'; kpiVolumesDB = res.volumes;
+                document.getElementById('systemModeBadge').innerText = "JVL Database";
+                document.getElementById('systemModeBadge').classList.replace('bg-gray-200', 'bg-blue-600');
+                document.getElementById('systemModeBadge').classList.replace('text-gray-700', 'text-white');
+                document.getElementById('btnChangeCSV').style.display = 'none';
+                processRawDataArray(res.errors);
+                hideLoading();
+            }).getJVLDatabase();
+        }
+
+        document.getElementById('csvFileMain').addEventListener('change', handleCSVUpload);
+        document.getElementById('csvFileHeader').addEventListener('change', handleCSVUpload);
+
+        function handleCSVUpload(e) {
+            const file = e.target.files[0]; if (!file) return;
+            document.getElementById('headerFileName').innerText = "ไฟล์: " + file.name; showLoading();
             Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                transformHeader: function(h) { return h.trim(); },
-                complete: function(results) {
-                    rawData = results.data.map(row => {
-                        row._dateObj = row['วันที่เกิดเหตุ'] ? normalizeDate(row['วันที่เกิดเหตุ']) : null;
-                        let rawLvl = String(row['ระดับ'] || '').trim().toUpperCase();
-                        row._level = rawLvl !== '' ? rawLvl : 'ไม่ระบุ';
-                        row._extractedDrugs = extractDrugs(row['รายละเอียด']);
-                        row._baseDrugs = [...new Set(row._extractedDrugs.map(d => getBaseDrugName(d)))];
-                        return row;
-                    }).filter(row => row._dateObj !== null);
-
-                    if (rawData.length > 0) {
-                        currentFilteredData = [...rawData];
-                        initDateRange();
-                        initSlicers();
-                        document.getElementById('welcomeScreen').style.display = 'none';
-                        document.getElementById('mainDashboard').style.display = 'block';
-                        clearDrillDown(); 
-                    }
-                }
+                header: true, skipEmptyLines: true, transformHeader: function(h) { return h.trim(); },
+                complete: function(results) { appMode = 'CSV'; document.getElementById('systemModeBadge').innerText = "CSV Upload"; document.getElementById('kpiManualMsg').classList.remove('hidden'); processRawDataArray(results.data); hideLoading(); }
             });
+        }
+
+        function processRawDataArray(dataArray) {
+            rawData = dataArray.map(row => {
+                row._dateObj = row['วันที่เกิดเหตุ'] ? normalizeDate(row['วันที่เกิดเหตุ']) : null;
+                let rawLvl = String(row['ระดับ'] || '').trim().toUpperCase(); row._level = rawLvl !== '' ? rawLvl : 'ไม่ระบุ';
+                row._extractedDrugs = extractDrugs(row['รายละเอียด']);
+                row._baseDrugs = [...new Set(row._extractedDrugs.map(d => getBaseDrugName(d)))];
+                return row;
+            }).filter(row => row._dateObj !== null);
+
+            if (rawData.length > 0) {
+                currentFilteredData = [...rawData]; initDateRange(); initSlicers();
+                document.getElementById('welcomeScreen').style.display = 'none'; document.getElementById('mainDashboard').style.display = 'block';
+                clearDrillDown(); 
+            } else { alert("ไม่พบข้อมูล"); }
         }
 
         function initDateRange() {
             const sortedInts = rawData.map(r => r._dateObj.intBE).sort((a, b) => a - b);
-            const minDate = rawData.find(r => r._dateObj.intBE === sortedInts[0]);
-            const maxDate = rawData.find(r => r._dateObj.intBE === sortedInts[sortedInts.length - 1]);
-            document.getElementById('startDate').value = minDate._dateObj.strCE;
-            document.getElementById('endDate').value = maxDate._dateObj.strCE;
+            document.getElementById('startDate').value = rawData.find(r => r._dateObj.intBE === sortedInts[0])._dateObj.strCE;
+            document.getElementById('endDate').value = rawData.find(r => r._dateObj.intBE === sortedInts[sortedInts.length - 1])._dateObj.strCE;
         }
 
         function initSlicers() {
             for (const [colName, elementId] of Object.entries(filterFields)) {
                 let uniqueValues = [...new Set(rawData.map(item => {
                     if (colName === 'ระดับ') return item._level;
+                    if (colName === 'ปีงบประมาณ') return item._dateObj.fy;
+                    if (colName === 'ไตรมาส') return item._dateObj.fq;
                     return String(item[colName] || '').trim() || 'ไม่ระบุ';
                 }))].filter(v => v !== 'ไม่ระบุ').sort();
                 
@@ -472,10 +441,8 @@
         }
 
         function applyFilters() {
-            const startCE = document.getElementById('startDate').value;
-            const endCE = document.getElementById('endDate').value;
-            const startInt = startCE ? parseInt(startCE.replace(/-/g, '')) + 5430000 : 0;
-            const endInt = endCE ? parseInt(endCE.replace(/-/g, '')) + 5430000 : 99999999;
+            const startCE = document.getElementById('startDate').value; const endCE = document.getElementById('endDate').value;
+            const startInt = startCE ? parseInt(startCE.replace(/-/g, '')) + 5430000 : 0; const endInt = endCE ? parseInt(endCE.replace(/-/g, '')) + 5430000 : 99999999;
             
             const selectedFilters = {};
             for (const [colName, elementId] of Object.entries(filterFields)) {
@@ -488,295 +455,224 @@
             currentFilteredData = rawData.filter(row => {
                 if (row._dateObj.intBE < startInt || row._dateObj.intBE > endInt) return false;
                 for (const colName in selectedFilters) {
-                    let val = (colName === 'ระดับ') ? row._level : String(row[colName] || '').trim() || 'ไม่ระบุ';
+                    let val = (colName === 'ระดับ') ? row._level : (colName === 'ปีงบประมาณ') ? row._dateObj.fy : (colName === 'ไตรมาส') ? row._dateObj.fq : String(row[colName] || '').trim() || 'ไม่ระบุ';
                     if (!selectedFilters[colName].includes(val)) return false;
                 }
                 return true;
             });
-            
             clearDrillDown();
         }
 
-        function triggerDrillDown(type, label) {
-            currentDrillDown = { type: type, label: label };
-            updateDashboard();
-            document.getElementById('activeFilterBar').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function clearDrillDown() {
-            currentDrillDown = null;
-            updateDashboard();
-        }
+        function triggerDrillDown(type, label) { currentDrillDown = { type: type, label: label }; updateDashboard(); document.getElementById('activeFilterBar').scrollIntoView({ behavior: 'smooth' }); }
+        function clearDrillDown() { currentDrillDown = null; updateDashboard(); }
 
         function updateDashboard() {
             if (currentDrillDown) {
-                let type = currentDrillDown.type;
-                let label = currentDrillDown.label;
-                let alertText = "";
-                
-                if (type === 'severe') {
-                    activeData = currentFilteredData.filter(r => ['E','F','G','H','I'].includes(r._level));
-                    alertText = "ความคลาดเคลื่อนระดับ E ขึ้นไป";
-                } else if (type === 'errorType') {
-                    activeData = currentFilteredData.filter(r => String(r['รายการ'] || '').trim() === label);
-                    alertText = `ประเภทความคลาดเคลื่อน: ${label}`;
-                } else if (type === 'drug') {
-                    activeData = currentFilteredData.filter(r => r._baseDrugs.includes(label));
-                    alertText = `กลุ่มยาที่เกี่ยวข้อง: ${label}`;
-                } else if (type === 'all') {
-                    activeData = [...currentFilteredData];
-                    alertText = `ข้อมูลทั้งหมด`;
-                } else {
-                    activeData = [...currentFilteredData];
-                }
+                let type = currentDrillDown.type; let label = currentDrillDown.label; let alertText = "";
+                if (type === 'severe') { activeData = currentFilteredData.filter(r => ['E','F','G','H','I'].includes(r._level)); alertText = "ความคลาดเคลื่อนระดับ E ขึ้นไป"; } 
+                else if (type === 'errorType') { activeData = currentFilteredData.filter(r => String(r['รายการ'] || '').trim() === label); alertText = `ประเภทความคลาดเคลื่อน: ${label}`; } 
+                else if (type === 'drug') { activeData = currentFilteredData.filter(r => r._baseDrugs.includes(label)); alertText = `กลุ่มยาที่เกี่ยวข้อง: ${label}`; } 
+                else if (type === 'kpi') { 
+                    let p = label.split('_'); 
+                    activeData = currentFilteredData.filter(r => String(r['NRLS'] || '').trim() === p[0] && getLocationType(r['สถานที่']) === p[1]); 
+                    alertText = `รายการ KPI: ${nrlsFullDict[p[0]]} (${p[1]})`; 
+                } 
+                else if (type === 'all') { activeData = [...currentFilteredData]; alertText = `ข้อมูลทั้งหมด`; } 
+                else { activeData = [...currentFilteredData]; }
 
-                document.getElementById('activeFilterBar').style.display = 'flex';
-                document.getElementById('activeFilterText').innerText = alertText;
-            } else {
-                activeData = [...currentFilteredData];
-                document.getElementById('activeFilterBar').style.display = 'none';
-            }
+                document.getElementById('activeFilterBar').style.display = 'flex'; document.getElementById('activeFilterText').innerText = alertText;
+            } else { activeData = [...currentFilteredData]; document.getElementById('activeFilterBar').style.display = 'none'; }
 
-            renderSummaryCards(activeData);
-            renderChartsFromData(activeData);
-            renderInsightReport(activeData);
-            calculateKPIs(); // ดึง activeData ไปคำนวณ KPI ต่อ
-            renderNLPTable(activeData);
+            renderSummaryCards(activeData); renderChartsFromData(activeData); calculateKPIs(); renderInsightReport(activeData); renderNLPTable(activeData);
         }
 
+        // ==========================================
+        // Rendering Functions
+        // ==========================================
         function renderSummaryCards(data) {
-            const total = data.length;
-            const severeLevels = ['E', 'F', 'G', 'H', 'I'];
-            const severeCount = data.filter(row => severeLevels.includes(row._level)).length;
-
-            const itemCounts = {};
-            const drugCounts = {}; 
-
-            data.forEach(row => {
-                const item = String(row['รายการ'] || '').trim() || 'ไม่ระบุ';
-                itemCounts[item] = (itemCounts[item] || 0) + 1;
-                row._baseDrugs.forEach(baseName => {
-                    drugCounts[baseName] = (drugCounts[baseName] || 0) + 1;
-                });
+            const total = data.length; const severeCount = data.filter(r => ['E', 'F', 'G', 'H', 'I'].includes(r._level)).length;
+            const itemCounts = {}; const drugCounts = {}; 
+            data.forEach(r => {
+                const item = String(r['รายการ'] || '').trim() || 'ไม่ระบุ'; itemCounts[item] = (itemCounts[item] || 0) + 1;
+                r._baseDrugs.forEach(b => drugCounts[b] = (drugCounts[b] || 0) + 1);
             });
+            const itemKeys = Object.keys(itemCounts).filter(k => k !== 'ไม่ระบุ'); const topItem = itemKeys.length > 0 ? itemKeys.reduce((a, b) => itemCounts[a] > itemCounts[b] ? a : b) : '-';
+            const drugKeys = Object.keys(drugCounts); const topDrug = drugKeys.length > 0 ? drugKeys.reduce((a, b) => drugCounts[a] > drugCounts[b] ? a : b) : '-';
 
-            const itemKeys = Object.keys(itemCounts).filter(k => k !== 'ไม่ระบุ');
-            const topItem = itemKeys.length > 0 ? itemKeys.reduce((a, b) => itemCounts[a] > itemCounts[b] ? a : b) : '-';
-            const topItemCount = topItem !== '-' ? itemCounts[topItem] : 0;
-
-            const drugKeys = Object.keys(drugCounts);
-            const topDrug = drugKeys.length > 0 ? drugKeys.reduce((a, b) => drugCounts[a] > drugCounts[b] ? a : b) : '-';
-            const topDrugCount = topDrug !== '-' ? drugCounts[topDrug] : 0;
-
-            document.getElementById('totalIncidents').innerText = total.toLocaleString();
-            document.getElementById('severeIncidents').innerText = severeCount.toLocaleString();
-            document.getElementById('severePercentMsg').innerText = `คิดเป็น ${total ? ((severeCount / total) * 100).toFixed(1) : 0}% ในช่วงเวลานี้`;
-
-            document.getElementById('topError').innerText = topItem;
-            document.getElementById('topErrorMsg').innerText = `พบในรายงาน ${topItemCount} ครั้ง`;
-            document.getElementById('topErrorRaw').value = topItem;
-
-            document.getElementById('topDrug').innerText = topDrug;
-            document.getElementById('topDrugMsg').innerText = `พบในรายงาน ${topDrugCount} ครั้ง`;
-            document.getElementById('topDrugRaw').value = topDrug;
+            document.getElementById('totalIncidents').innerText = total.toLocaleString(); document.getElementById('severeIncidents').innerText = severeCount.toLocaleString();
+            document.getElementById('topError').innerText = topItem; document.getElementById('topErrorMsg').innerText = `พบในรายงาน ${topItem !== '-' ? itemCounts[topItem] : 0} ครั้ง`; document.getElementById('topErrorRaw').value = topItem;
+            document.getElementById('topDrug').innerText = topDrug; document.getElementById('topDrugMsg').innerText = `พบในรายงาน ${topDrug !== '-' ? drugCounts[topDrug] : 0} ครั้ง`; document.getElementById('topDrugRaw').value = topDrug;
         }
 
         function renderChartsFromData(data) {
-            const totalFiltered = data.length;
-            const itemCounts = {};
-            const drugCounts = {}; 
-            const monthCounts = {};
-            const relationData = {}; 
-            const allItemsFound = new Set(); 
-
-            data.forEach(row => {
-                const item = String(row['รายการ'] || '').trim() || 'ไม่ระบุ';
-                itemCounts[item] = (itemCounts[item] || 0) + 1;
-
-                row._baseDrugs.forEach(baseName => {
-                    drugCounts[baseName] = (drugCounts[baseName] || 0) + 1;
-                    if (!relationData[baseName]) relationData[baseName] = {};
-                    relationData[baseName][item] = (relationData[baseName][item] || 0) + 1;
-                    allItemsFound.add(item);
+            const itemCounts = {}; const drugCounts = {}; const relationData = {}; const allItemsFound = new Set(); 
+            data.forEach(r => {
+                const item = String(r['รายการ'] || '').trim() || 'ไม่ระบุ'; itemCounts[item] = (itemCounts[item] || 0) + 1;
+                r._baseDrugs.forEach(b => {
+                    drugCounts[b] = (drugCounts[b] || 0) + 1;
+                    if (!relationData[b]) relationData[b] = {}; relationData[b][item] = (relationData[b][item] || 0) + 1; allItemsFound.add(item);
                 });
-
-                const mY = `${row._dateObj.year}-${row._dateObj.month.toString().padStart(2, '0')}`;
-                monthCounts[mY] = (monthCounts[mY] || 0) + 1;
             });
 
             const sortedItems = Object.keys(itemCounts).sort((a,b) => itemCounts[b]-itemCounts[a]).slice(0, 10);
-            const itemData = sortedItems.map(k => itemCounts[k]);
-            renderChart('errorTypeChart', 'bar', sortedItems, itemData, '#6366f1', true, 'errorType', totalFiltered);
-
+            renderChart('errorTypeChart', 'bar', sortedItems, sortedItems.map(k => itemCounts[k]), '#6366f1', true, 'errorType');
             const sortedDrugs = Object.keys(drugCounts).sort((a,b) => drugCounts[b] - drugCounts[a]).slice(0, 15);
-            const drugData = sortedDrugs.map(d => drugCounts[d]);
-            renderChart('drugChart', 'bar', sortedDrugs, drugData, '#10b981', true, 'drug', totalFiltered);
-            
+            renderChart('drugChart', 'bar', sortedDrugs, sortedDrugs.map(d => drugCounts[d]), '#10b981', true, 'drug');
             renderRelationChart('relationChart', sortedDrugs, relationData, Array.from(allItemsFound));
         }
 
-        function renderChart(canvasId, type, labels, data, color, isHorizontal, filterType, total) {
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            if (charts[canvasId]) charts[canvasId].destroy();
-
+        function renderChart(canvasId, type, labels, data, color, isHorizontal, filterType) {
+            const ctx = document.getElementById(canvasId).getContext('2d'); if (charts[canvasId]) charts[canvasId].destroy();
             charts[canvasId] = new Chart(ctx, {
-                type: type,
-                data: {
-                    labels: labels,
-                    datasets: [{ data: data, backgroundColor: color + 'CC', borderColor: color, borderWidth: 1, borderRadius: 4 }]
-                },
+                type: type, data: { labels: labels, datasets: [{ data: data, backgroundColor: color + 'CC', borderColor: color, borderWidth: 1, borderRadius: 4 }] },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
-                    indexAxis: isHorizontal ? 'y' : 'x',
-                    plugins: { 
-                        legend: { display: false }, 
-                        tooltip: { 
-                            callbacks: { 
-                                label: function(c) { return ` ${c.raw} ครั้ง (${total ? ((c.raw/total)*100).toFixed(1) : 0}%)`; } 
-                            } 
-                        } 
-                    },
+                    responsive: true, maintainAspectRatio: false, indexAxis: isHorizontal ? 'y' : 'x',
+                    plugins: { datalabels: { display: false }, legend: { display: false } },
                     onClick: (e, el) => { if(el.length > 0) triggerDrillDown(filterType, labels[el[0].index]); }
                 }
             });
         }
 
         function renderRelationChart(canvasId, topDrugsList, relationData, allItemsFound) {
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            if (charts[canvasId]) charts[canvasId].destroy();
-
+            const ctx = document.getElementById(canvasId).getContext('2d'); if (charts[canvasId]) charts[canvasId].destroy();
             const colorPalette = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e'];
-            
             const datasets = [];
             allItemsFound.forEach((item, index) => {
-                let dataForThisItem = [];
-                let hasData = false;
-                topDrugsList.forEach(drug => {
-                    let count = (relationData[drug] && relationData[drug][item]) ? relationData[drug][item] : 0;
-                    dataForThisItem.push(count);
-                    if(count > 0) hasData = true;
-                });
-                if (hasData) {
-                    datasets.push({
-                        label: item, data: dataForThisItem,
-                        backgroundColor: colorPalette[index % colorPalette.length] + 'E6',
-                        borderWidth: 0
-                    });
-                }
+                let dataForThisItem = []; let hasData = false;
+                topDrugsList.forEach(drug => { let c = (relationData[drug] && relationData[drug][item]) ? relationData[drug][item] : 0; dataForThisItem.push(c); if(c>0) hasData=true; });
+                if (hasData) datasets.push({ label: item, data: dataForThisItem, backgroundColor: colorPalette[index % colorPalette.length] + 'E6', borderWidth: 0 });
             });
-
             charts[canvasId] = new Chart(ctx, {
-                type: 'bar',
-                data: { labels: topDrugsList, datasets: datasets },
+                type: 'bar', data: { labels: topDrugsList, datasets: datasets },
                 options: {
-                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-                    scales: { x: { stacked: true }, y: { stacked: true } },
-                    plugins: {
-                        legend: { display: true, position: 'right', labels: { boxWidth: 12, font: { size: 10 } } },
-                        tooltip: { mode: 'index', intersect: false }
-                    },
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true }, y: { stacked: true } },
+                    plugins: { datalabels: { display: false }, legend: { display: true, position: 'right', labels: { boxWidth: 12, font: { size: 10 } } }, tooltip: { mode: 'index', intersect: false } },
                     onClick: (e, el) => { if(el.length > 0) triggerDrillDown('drug', topDrugsList[el[0].index]); }
                 }
             });
         }
 
         // ==========================================
-        // 5. KPI & Reports Module
+        // 5. KPI & Run Charts Module
         // ==========================================
+        const nrlsFullDict = { 'CPM201': 'Prescribing', 'CPM202': 'Transcribing', 'CPM203': 'Pre-dispensing', 'CPM204': 'Dispensing', 'CPM205': 'Administration', 'CPM101': 'แพ้ยาซ้ำ', 'CPM102': 'ไม่ทำตาม GL High Alert Drug' }; // ย่อให้สั้น
+        function getLocationType(loc) { if(!loc) return 'OTHER'; if(loc.includes('นอก')||loc.includes('ชั้น1')) return 'OPD'; if(loc.includes('ใน')||loc.includes('ชั้น 5')||loc.includes('5 ชั้น')) return 'IPD'; return 'OTHER'; }
 
         function calculateKPIs() {
-            const opdVol = parseFloat(document.getElementById('opdVolume').value) || 1;
-            const ipdVol = parseFloat(document.getElementById('ipdVolume').value) || 1;
+            let opdVolAvg = parseFloat(document.getElementById('opdVolume').value) || 1;
+            let ipdVolAvg = parseFloat(document.getElementById('ipdVolume').value) || 1;
+            
+            // หาเดือนทั้งหมดที่มีใน Filtered Data เพื่อใช้วาดแกน X ของ Run Chart (เรียงปีเดือน)
+            let monthsSet = new Set();
+            activeData.forEach(r => { monthsSet.add(`${r._dateObj.year}-${r._dateObj.month.toString().padStart(2, '0')}`); });
+            let monthsArr = Array.from(monthsSet).sort();
+            
+            if (appMode === 'JVL') {
+                document.getElementById('opdVolume').disabled = true; document.getElementById('ipdVolume').disabled = true;
+                document.getElementById('kpiAutoMsg').classList.remove('hidden'); document.getElementById('kpiAutoMsg').classList.add('flex');
+            } else {
+                document.getElementById('opdVolume').disabled = false; document.getElementById('ipdVolume').disabled = false;
+                document.getElementById('kpiAutoMsg').classList.add('hidden'); document.getElementById('kpiAutoMsg').classList.remove('flex');
+            }
 
-            let counts = {};
-            let otherNrlsCounts = {};
-
+            // นับรวมสำหรับ KPI Table หลัก
+            let counts = {}; let otherNrlsCounts = {};
             activeData.forEach(r => {
-                let nrls = String(r['NRLS'] || '').trim();
-                if (!nrls) return;
-
-                let locType = getLocationType(r['สถานที่']);
-                let key = nrls + '_' + locType;
+                let nrls = String(r['NRLS'] || '').trim(); if (!nrls) return;
+                let key = nrls + '_' + getLocationType(r['สถานที่']);
                 counts[key] = (counts[key] || 0) + 1;
-
-                // แยกนับรายการที่ไม่อยู่ใน 10 KPI หลัก
-                if (!['CPM201','CPM202','CPM203','CPM204','CPM205'].includes(nrls)) {
-                    otherNrlsCounts[nrls] = (otherNrlsCounts[nrls] || 0) + 1;
-                }
+                if (!['CPM201','CPM202','CPM203','CPM204','CPM205'].includes(nrls)) otherNrlsCounts[nrls] = (otherNrlsCounts[nrls] || 0) + 1;
             });
 
-            // 10 ตัวชี้วัดบังคับโชว์
+            // คำนวณ Volume รวมสำหรับตารางรวม (ถ้า CSV คือยอดที่กรอกตรงๆ)
+            let totalOpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m] ? kpiVolumesDB[m].opd : 0), 0) : opdVolAvg;
+            let totalIpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m] ? kpiVolumesDB[m].ipd : 0), 0) : ipdVolAvg;
+            if(totalOpdVol===0) totalOpdVol=1; if(totalIpdVol===0) totalIpdVol=1;
+
             const kpiDef = [
-                { id: 'CPM201_OPD', name: 'Prescribing Error OPD', nrlsName: 'Medication error : Prescribing', targetText: '< 10 ต่อ 1000 ใบสั่งยา', limit: 10, vol: opdVol },
-                { id: 'CPM201_IPD', name: 'Prescribing Error IPD', nrlsName: 'Medication error : Prescribing', targetText: '< 10 ต่อ 1000 วันนอน', limit: 10, vol: ipdVol },
-                { id: 'CPM202_OPD', name: 'Transcribing Error OPD', nrlsName: 'Medication error : Transcribing', targetText: '< 10 ต่อ 1000 ใบสั่งยา', limit: 10, vol: opdVol },
-                { id: 'CPM202_IPD', name: 'Transcribing Error IPD', nrlsName: 'Medication error : Transcribing', targetText: '< 10 ต่อ 1000 วันนอน', limit: 10, vol: ipdVol },
-                { id: 'CPM203_OPD', name: 'Pre-Dispensing Error OPD', nrlsName: 'Medication error : Pre-dispensing', targetText: '< 30 ต่อ 1000 ใบสั่งยา', limit: 30, vol: opdVol },
-                { id: 'CPM203_IPD', name: 'Pre-Dispensing Error IPD', nrlsName: 'Medication error : Pre-dispensing', targetText: '< 30 ต่อ 1000 วันนอน', limit: 30, vol: ipdVol },
-                { id: 'CPM204_OPD', name: 'Dispensing Error OPD', nrlsName: 'Medication error : Dispensing', targetText: '< 1 ต่อ 1000 ใบสั่งยา', limit: 1, vol: opdVol },
-                { id: 'CPM204_IPD', name: 'Dispensing Error IPD', nrlsName: 'Medication error : Dispensing', targetText: '< 1 ต่อ 1000 วันนอน', limit: 1, vol: ipdVol },
-                { id: 'CPM205_OPD', name: 'Administration Error OPD', nrlsName: 'Medication error : Administration', targetText: '< 1 ต่อ 1000 ใบสั่งยา', limit: 1, vol: opdVol },
-                { id: 'CPM205_IPD', name: 'Administration Error IPD', nrlsName: 'Medication error : Administration', targetText: '< 1 ต่อ 1000 วันนอน', limit: 1, vol: ipdVol }
+                { id: 'CPM201_OPD', nrls: 'CPM201', name: 'Prescribing OPD', limit: 10, vol: totalOpdVol }, { id: 'CPM201_IPD', nrls: 'CPM201', name: 'Prescribing IPD', limit: 10, vol: totalIpdVol },
+                { id: 'CPM202_OPD', nrls: 'CPM202', name: 'Transcribing OPD', limit: 10, vol: totalOpdVol }, { id: 'CPM202_IPD', nrls: 'CPM202', name: 'Transcribing IPD', limit: 10, vol: totalIpdVol },
+                { id: 'CPM203_OPD', nrls: 'CPM203', name: 'Pre-Dispensing OPD', limit: 30, vol: totalOpdVol }, { id: 'CPM203_IPD', nrls: 'CPM203', name: 'Pre-Dispensing IPD', limit: 30, vol: totalIpdVol },
+                { id: 'CPM204_OPD', nrls: 'CPM204', name: 'Dispensing OPD', limit: 1, vol: totalOpdVol }, { id: 'CPM204_IPD', nrls: 'CPM204', name: 'Dispensing IPD', limit: 1, vol: totalIpdVol },
+                { id: 'CPM205_OPD', nrls: 'CPM205', name: 'Administration OPD', limit: 1, vol: totalOpdVol }, { id: 'CPM205_IPD', nrls: 'CPM205', name: 'Administration IPD', limit: 1, vol: totalIpdVol }
             ];
 
-            const tbody = document.getElementById('kpiTableBody');
-            tbody.innerHTML = '';
-
-            // Render 10 KPIs
+            const tbody = document.getElementById('kpiTableBody'); tbody.innerHTML = '';
             kpiDef.forEach(k => {
-                let count = counts[k.id] || 0;
-                let rate = (count * 1000) / k.vol;
-                
-                let isPass = rate <= k.limit;
-                let statusHtml = isPass 
-                    ? `<span class="bg-green-100 text-green-700 px-2 py-1 rounded font-bold">ผ่านเกณฑ์</span>` 
-                    : `<span class="bg-red-100 text-red-700 px-2 py-1 rounded font-bold">เกินเกณฑ์</span>`;
-
-                let tr = document.createElement('tr');
-                tr.classList.add('hover:bg-rose-50');
-                tr.innerHTML = `
-                    <td class="p-2 border">
-                        <div class="font-bold text-gray-800">${k.name}</div>
-                        <div class="text-[11px] text-gray-500">${k.nrlsName}</div>
-                    </td>
-                    <td class="p-2 border text-center text-rose-700 font-medium">${k.targetText}</td>
-                    <td class="p-2 border text-center font-bold text-gray-800">${count}</td>
-                    <td class="p-2 border text-center font-bold ${isPass ? 'text-green-600' : 'text-red-600'}">${rate.toFixed(2)}</td>
-                    <td class="p-2 border text-center">${statusHtml}</td>
-                `;
+                let rate = ((counts[k.id] || 0) * 1000) / k.vol; let isPass = rate <= k.limit;
+                let tr = document.createElement('tr'); tr.classList.add('hover:bg-rose-100', 'cursor-pointer', 'transition');
+                tr.onclick = () => triggerDrillDown('kpi', k.id);
+                tr.innerHTML = `<td class="p-2 border font-bold text-gray-800">${k.name}</td><td class="p-2 border text-center text-rose-700">&lt; ${k.limit} ต่อ 1,000</td><td class="p-2 border text-center font-bold">${counts[k.id] || 0}</td><td class="p-2 border text-center font-bold ${isPass?'text-green-600':'text-red-600'}">${rate.toFixed(2)}</td><td class="p-2 border text-center">${isPass?'<span class="bg-green-100 text-green-700 px-2 rounded">ผ่าน</span>':'<span class="bg-red-100 text-red-700 px-2 rounded">เกิน</span>'}</td>`;
                 tbody.appendChild(tr);
             });
 
-            // Render Other NRLS (เฉพาะที่มียอด > 0)
-            let otherKeys = Object.keys(otherNrlsCounts).sort();
-            if (otherKeys.length > 0) {
-                let headerRow = document.createElement('tr');
-                headerRow.innerHTML = `<td colspan="5" class="bg-gray-100 p-2 font-bold text-gray-700 text-center">รหัส NRLS อื่นๆ ที่พบในช่วงเวลานี้</td>`;
-                tbody.appendChild(headerRow);
+            // --- เตรียมวาด 5 Run Charts ---
+            const runChartLabels = monthsArr.map(m => {
+                let p = m.split('-'); let fy = parseInt(p[0]); let mo = parseInt(p[1]);
+                if (mo >= 10) fy += 1;
+                let q = mo >= 10 ? '1' : (mo <= 3 ? '2' : (mo <= 6 ? '3' : '4'));
+                return `${thaiMonthsShort[mo-1]} ${p[0].substring(2)} (Q${q}/${fy.toString().substring(2)})`;
+            });
 
-                otherKeys.forEach(nrls => {
-                    let count = otherNrlsCounts[nrls];
-                    let nrlsName = nrlsFullDict[nrls] || 'N/A';
-                    let tr = document.createElement('tr');
-                    tr.classList.add('hover:bg-gray-50');
-                    tr.innerHTML = `
-                        <td class="p-2 border"><div class="font-bold text-gray-700">[${nrls}]</div><div class="text-[11px] text-gray-500">${nrlsName}</div></td>
-                        <td class="p-2 border text-center text-gray-400">-</td>
-                        <td class="p-2 border text-center font-bold text-gray-800">${count}</td>
-                        <td class="p-2 border text-center text-gray-400">-</td>
-                        <td class="p-2 border text-center text-gray-400">-</td>
-                    `;
-                    tbody.appendChild(tr);
+            const kpiSteps = [
+                { id: 'CPM201', target: 10 }, { id: 'CPM202', target: 10 }, { id: 'CPM203', target: 30 }, { id: 'CPM204', target: 1 }, { id: 'CPM205', target: 1 }
+            ];
+
+            kpiSteps.forEach(step => {
+                let opdData = []; let ipdData = []; let targetData = [];
+                monthsArr.forEach(m => {
+                    // จำนวน Error รายเดือน
+                    let opdCount = activeData.filter(r => `${r._dateObj.year}-${r._dateObj.month.toString().padStart(2,'0')}` === m && r['NRLS'] === step.id && getLocationType(r['สถานที่']) === 'OPD').length;
+                    let ipdCount = activeData.filter(r => `${r._dateObj.year}-${r._dateObj.month.toString().padStart(2,'0')}` === m && r['NRLS'] === step.id && getLocationType(r['สถานที่']) === 'IPD').length;
+                    
+                    // ปริมาณงานรายเดือน
+                    let oVol = appMode === 'JVL' ? (kpiVolumesDB[m] ? kpiVolumesDB[m].opd : 1) : opdVolAvg;
+                    let iVol = appMode === 'JVL' ? (kpiVolumesDB[m] ? kpiVolumesDB[m].ipd : 1) : ipdVolAvg;
+                    if(oVol===0) oVol=1; if(iVol===0) iVol=1;
+
+                    opdData.push({ rate: ((opdCount*1000)/oVol).toFixed(2), count: opdCount, vol: oVol });
+                    ipdData.push({ rate: ((ipdCount*1000)/iVol).toFixed(2), count: ipdCount, vol: iVol });
+                    targetData.push(step.target);
                 });
-            }
+                renderRunChart(`runChart_${step.id}`, runChartLabels, opdData, ipdData, targetData, step.target);
+            });
+        }
+
+        function renderRunChart(canvasId, labels, opdData, ipdData, targetData, targetLimit) {
+            const ctx = document.getElementById(canvasId).getContext('2d'); if (charts[canvasId]) charts[canvasId].destroy();
+            charts[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'OPD', data: opdData.map(d=>d.rate), customData: opdData, borderColor: '#2563eb', backgroundColor: '#2563eb', tension: 0.3, pointRadius: 4 },
+                        { label: 'IPD', data: ipdData.map(d=>d.rate), customData: ipdData, borderColor: '#f97316', backgroundColor: '#f97316', tension: 0.3, pointRadius: 4 },
+                        { label: 'เป้าหมาย', data: targetData, borderColor: '#ef4444', borderDash: [5, 5], pointRadius: 0, borderWidth: 2, fill: false, datalabels: { display: false } }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, suggestedMax: targetLimit * 1.5 } },
+                    plugins: {
+                        legend: { display: true, position: 'bottom', labels: { boxWidth: 12, usePointStyle: true } },
+                        datalabels: { align: 'top', font: { size: 10, weight: 'bold' }, formatter: (value) => value > 0 ? value : '' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    let ds = ctx.dataset; if (ds.label === 'เป้าหมาย') return `เป้าหมาย: ${ctx.raw}`;
+                                    let cData = ds.customData[ctx.dataIndex];
+                                    return `${ds.label}: ${ctx.raw} (ผิด ${cData.count} ครั้ง / งาน ${cData.vol})`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         function renderInsightReport(data) {
             if (insightTableInstance) insightTableInstance.destroy();
-            
-            let insightData = {};
-            let totalEvents = data.length;
-
+            let insightData = {}; let totalEvents = data.length;
             data.forEach(r => {
                 let item = String(r['รายการ'] || '').trim() || 'ไม่ระบุ';
                 if (r._baseDrugs.length === 0) {
@@ -792,77 +688,24 @@
                 }
             });
 
-            let sortedInsights = Object.values(insightData).sort((a, b) => b.count - a.count);
-            
-            const body = document.getElementById('insightTableBody');
-            body.innerHTML = '';
-            
-            sortedInsights.forEach(row => {
-                let percent = totalEvents > 0 ? ((row.count / totalEvents) * 100).toFixed(1) : 0;
-                let tr = document.createElement('tr');
-                tr.classList.add('hover:bg-indigo-50');
-                tr.innerHTML = `
-                    <td class="p-2 border font-bold text-gray-700">${row.item}</td>
-                    <td class="p-2 border text-indigo-700 font-semibold">${row.baseDrug}</td>
-                    <td class="p-2 border text-center font-bold text-gray-800">${row.count}</td>
-                    <td class="p-2 border text-center text-gray-500">${percent}%</td>
-                `;
+            const body = document.getElementById('insightTableBody'); body.innerHTML = '';
+            Object.values(insightData).sort((a, b) => b.count - a.count).forEach(row => {
+                let tr = document.createElement('tr'); tr.innerHTML = `<td class="p-2 border">${row.item}</td><td class="p-2 border font-bold text-indigo-700">${row.baseDrug}</td><td class="p-2 border text-center">${row.count}</td><td class="p-2 border text-center">${totalEvents ? ((row.count/totalEvents)*100).toFixed(1) : 0}%</td>`;
                 body.appendChild(tr);
             });
-
-            insightTableInstance = $('#insightTable').DataTable({
-                dom: '<"flex flex-col md:flex-row justify-between items-center mb-2"lB>rtip',
-                pageLength: 10,
-                lengthMenu: [[10, 20, 50, -1], ["10 แถว", "20 แถว", "50 แถว", "ทั้งหมด"]],
-                buttons: [
-                    { extend: 'excel', text: '📥 Export Excel สรุปผล', className: 'bg-green-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm' },
-                    { extend: 'print', text: '🖨️ Print รายงาน', className: 'bg-blue-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm' }
-                ],
-                language: { info: "แสดงข้อมูลสรุป _START_ ถึง _END_ จาก _TOTAL_ ความสัมพันธ์" }
-            });
+            insightTableInstance = $('#insightTable').DataTable({ dom: '<"flex flex-col md:flex-row justify-between items-center mb-2"lB>rtip', pageLength: 10, buttons: ['excel', 'print'] });
         }
 
         function renderNLPTable(data) {
             if (nlpTableInstance) nlpTableInstance.destroy();
-            const body = document.getElementById('nlpTableBody');
-            body.innerHTML = '';
-            
-            let sortedData = [...data].sort((a,b) => b._dateObj.intBE - a._dateObj.intBE);
-            
-            sortedData.forEach(r => {
-                const dObj = r._dateObj;
-                const displayDate = dObj ? `${dObj.day.toString().padStart(2,'0')}/${dObj.month.toString().padStart(2,'0')}/${dObj.year}` : r['วันที่เกิดเหตุ'];
-                
-                let drugsHtml = r._extractedDrugs.length > 0 
-                    ? r._extractedDrugs.map(d => `<span class="inline-block bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-1 rounded-md mb-1 mr-1 shadow-sm font-semibold">${d}</span>`).join('')
-                    : `<span class="text-gray-400 italic text-[11px]">ไม่พบชื่อยาภาษาอังกฤษ</span>`;
-
-                let detailHtml = highlightText(r['รายละเอียด'], r._extractedDrugs);
-                let levelColor = ['E','F','G','H','I'].includes(r._level) ? 'bg-red-50 text-red-700 border-red-200' : 'bg-gray-100 text-gray-700 border-gray-200';
-
-                let tr = document.createElement('tr');
-                tr.classList.add('hover:bg-emerald-50', 'transition');
-                
-                tr.innerHTML = `
-                    <td class="p-2 border text-center whitespace-nowrap">${displayDate}</td>
-                    <td class="p-2 border text-center"><span class="px-2 py-1 ${levelColor} rounded font-bold border">${r._level}</span></td>
-                    <td class="p-2 border font-bold text-gray-700">${r['รายการ']}</td>
-                    <td class="p-2 border align-top">${drugsHtml}</td>
-                    <td class="p-3 border text-gray-600 leading-relaxed min-w-[300px] text-[13px]">[${r['เลขที่ใบความเสี่ยง']}] ${detailHtml}</td>
-                `;
+            const body = document.getElementById('nlpTableBody'); body.innerHTML = '';
+            [...data].sort((a,b) => b._dateObj.intBE - a._dateObj.intBE).forEach(r => {
+                const displayDate = r._dateObj ? `${r._dateObj.day.toString().padStart(2,'0')}/${r._dateObj.month.toString().padStart(2,'0')}/${r._dateObj.year}` : r['วันที่เกิดเหตุ'];
+                let drugsHtml = r._extractedDrugs.length > 0 ? r._extractedDrugs.map(d => `<span class="inline-block bg-emerald-100 text-emerald-800 px-2 rounded mb-1 mr-1">${d}</span>`).join('') : `-`;
+                let tr = document.createElement('tr'); tr.innerHTML = `<td class="p-2 border text-center">${displayDate}</td><td class="p-2 border text-center font-bold">${r._level}</td><td class="p-2 border text-gray-700"><span class="font-bold">${r['รายการ']}</span><br><span class="text-[10px] text-gray-400">${r['สถานที่']}</span></td><td class="p-2 border">${drugsHtml}</td><td class="p-3 border text-gray-600 text-[13px]">[${r['เลขที่ใบความเสี่ยง']}] ${highlightText(r['รายละเอียด'], r._extractedDrugs)}</td>`;
                 body.appendChild(tr);
             });
-
-            nlpTableInstance = $('#nlpTable').DataTable({
-                dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"l<"flex"Bf>>rtip',
-                pageLength: 10,
-                lengthMenu: [[10, 20, 50, 100, -1], ["10 แถว", "20 แถว", "50 แถว", "100 แถว", "ทั้งหมด"]],
-                buttons: [
-                    { extend: 'excel', text: '📥 Export Excel (เจาะลึก)', className: 'bg-emerald-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm hover:bg-emerald-700' },
-                    { extend: 'print', text: '🖨️ Print ข้อมูล', className: 'bg-blue-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm hover:bg-blue-700' }
-                ],
-                language: { search: "🔍 ค้นหา (พิมพ์ชื่อยาได้เลย):", info: "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ", lengthMenu: "แสดง _MENU_" }
-            });
+            nlpTableInstance = $('#nlpTable').DataTable({ dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"l<"flex"Bf>>rtip', pageLength: 10, buttons: ['excel', 'print'] });
         }
     </script>
 </body>
