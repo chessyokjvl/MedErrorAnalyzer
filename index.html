@@ -45,8 +45,8 @@
                 <p class="text-gray-500 text-sm mt-1">เชื่อมต่อฐานข้อมูล Google Sheets อัตโนมัติ</p>
             </div>
             <div class="space-y-4">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Username</label><input type="text" id="username" class="w-full border border-gray-300 rounded-lg p-3"></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Password</label><input type="password" id="password" class="w-full border border-gray-300 rounded-lg p-3"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Username</label><input type="text" id="username" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Password</label><input type="password" id="password" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"></div>
                 <div id="loginError" class="text-red-500 text-sm hidden font-medium text-center"></div>
                 <button onclick="executeLogin()" id="btnLogin" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg hover:bg-emerald-700 shadow-md">เข้าสู่ระบบ</button>
                 <button onclick="closeLoginModal()" class="w-full bg-gray-100 text-gray-600 font-bold py-3 rounded-lg hover:bg-gray-200">ยกเลิก</button>
@@ -57,7 +57,7 @@
     <div id="loadingOverlay" class="fixed inset-0 z-[60] bg-white bg-opacity-90 flex flex-col items-center justify-center hidden">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-600 mb-4"></div>
         <h2 class="text-xl font-bold text-gray-800">กำลังประมวลผลข้อมูล...</h2>
-        <p class="text-gray-500">ระบบ API กำลังดึงข้อมูลจากฐานข้อมูล กรุณารอสักครู่</p>
+        <p class="text-gray-500">ระบบกำลังวิเคราะห์ข้อมูล กรุณารอสักครู่</p>
     </div>
 
     <main class="max-w-7xl mx-auto space-y-4 w-full">
@@ -68,7 +68,8 @@
                 <h3 class="text-emerald-800 font-bold mb-2 flex items-center gap-2">✨ JVL Hybrid Cloud System</h3>
                 <ul class="list-disc list-inside text-gray-700 space-y-2 text-sm md:text-base">
                     <li>รองรับระบบ <b>ปีงบประมาณและไตรมาส</b> อย่างสมบูรณ์แบบ</li>
-                    <li>เชื่อมต่อ API ข้าม Server ได้อย่างปลอดภัยผ่านระบบ Fetch</li>
+                    <li>เพิ่มกราฟ Run Chart แสดงแนวโน้ม KPI รายเดือนแบบมีเส้นเป้าหมายกำกับ</li>
+                    <li>ตาราง KPI คลิกเพื่อ Drill-down เจาะลึกถึงเคสจริงได้ทันที</li>
                 </ul>
             </div>
             <div class="flex flex-col md:flex-row justify-center gap-4">
@@ -242,8 +243,7 @@
 
     <script>
         // ==========================================
-        // 🚀 URL ของ Google Apps Script ที่ Deploy ไว้
-        // นำลิงก์ของคุณมาใส่ตรงนี้ได้เลยครับ!
+        // 🚀 URL ของ Google Apps Script ที่ Deploy ไว้ (อย่าลืม New Deployment)
         // ==========================================
         const GAS_URL = "https://script.google.com/macros/s/AKfycbxc0Xk_LTKAJ84QkvdckyjJE6-iR6eTZz9CVvqBqYAkYM6YYlcu395_qHGQApVFTgE/exec";
 
@@ -263,106 +263,60 @@
         let insightTableInstance = null;
         let tomSelects = {}; 
 
-        // ==========================================
-        // 🚀 ระบบดักจับปุ่ม Enter สำหรับ Login
-        // ==========================================
-        document.getElementById('username').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('password').focus(); // เด้งไปช่องรหัสผ่าน
-            }
-        });
-
-        document.getElementById('password').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                executeLogin(); // สั่ง Login ทันที
-            }
-        });
+        // ดักจับ Enter สำหรับ Login
+        document.getElementById('username').addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('password').focus(); } });
+        document.getElementById('password').addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); executeLogin(); } });
         
-        // ------------------------------------------
-        // API Fetch Functions สำหรับเชื่อม GAS แบบข้ามโดเมน (อัปเกรด Failsafe)
-        // ------------------------------------------
         async function executeLogin() {
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
-            
-            if(!u || !p) {
-                document.getElementById('loginError').innerText = "กรุณากรอก Username และ Password ให้ครบถ้วน";
-                document.getElementById('loginError').classList.remove('hidden');
-                return;
-            }
+            if(!u || !p) { document.getElementById('loginError').innerText = "กรุณากรอกข้อมูลให้ครบถ้วน"; document.getElementById('loginError').classList.remove('hidden'); return; }
 
-            document.getElementById('btnLogin').innerText = "กำลังตรวจสอบกับระบบ...";
-            document.getElementById('btnLogin').disabled = true;
+            document.getElementById('btnLogin').innerText = "กำลังตรวจสอบกับระบบ..."; document.getElementById('btnLogin').disabled = true;
 
             try {
-                let response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // ป้องกันปัญหา CORS
-                    body: JSON.stringify({ action: 'login', username: u, password: p })
-                });
-                
+                let response = await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'login', username: u, password: p }) });
                 let res = await response.json();
                 
-                if(res.success) {
-                    closeLoginModal();
-                    loadJVLData();
-                } else {
-                    document.getElementById('loginError').innerText = res.message;
-                    document.getElementById('loginError').classList.remove('hidden');
-                    document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ";
-                    document.getElementById('btnLogin').disabled = false;
+                if(res.success) { closeLoginModal(); loadJVLData(); } 
+                else {
+                    document.getElementById('loginError').innerText = res.message; document.getElementById('loginError').classList.remove('hidden');
+                    document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ"; document.getElementById('btnLogin').disabled = false;
                 }
             } catch (error) {
-                console.error("Login Error:", error);
-                document.getElementById('loginError').innerText = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ URL หรืออินเทอร์เน็ต";
-                document.getElementById('loginError').classList.remove('hidden');
-                document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ";
-                document.getElementById('btnLogin').disabled = false;
+                document.getElementById('loginError').innerText = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้"; document.getElementById('loginError').classList.remove('hidden');
+                document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ"; document.getElementById('btnLogin').disabled = false;
             }
         }
 
         async function loadJVLData() {
-            showLoading(); // แสดงหน้าจอโหลด
+            showLoading();
             try {
-                let response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // ป้องกันปัญหา CORS
-                    body: JSON.stringify({ action: 'getData' })
-                });
-                
+                let response = await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'getData' }) });
                 let res = await response.json();
                 
                 if(res.success) {
-                    appMode = 'JVL';
-                    kpiVolumesDB = res.data.volumes || {};
+                    appMode = 'JVL'; kpiVolumesDB = res.data.volumes || {};
                     document.getElementById('systemModeBadge').innerText = "JVL Database";
                     document.getElementById('systemModeBadge').classList.replace('bg-gray-200', 'bg-blue-600');
                     document.getElementById('systemModeBadge').classList.replace('text-gray-700', 'text-white');
                     document.getElementById('btnChangeCSV').style.display = 'none';
                     
-                    let dbErrors = res.data.errors || [];
-                    if (dbErrors.length > 0) {
-                        processRawDataArray(dbErrors);
+                    if (res.data.errors && res.data.errors.length > 0) {
+                        processRawDataArray(res.data.errors);
                     } else {
-                        alert("ไม่พบข้อมูลใน Sheet 'MedErrors' หรือฐานข้อมูลว่างเปล่า");
+                        alert("ไม่พบข้อมูลใน Sheet 'MedErrors'");
                     }
-                } else {
-                    alert("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + res.message);
-                }
+                } else { alert("เกิดข้อผิดพลาดจากฐานข้อมูล: " + res.message); }
             } catch (error) {
-                console.error("Data Fetch Error:", error);
-                alert("การเชื่อมต่อขัดข้อง หรือใช้เวลาดึงข้อมูลนานเกินไป (หากข้อมูลมีจำนวนมาก กรุณารอหรือตรวจสอบอินเทอร์เน็ต)");
-            } finally {
-                hideLoading(); // 🛡️ Failsafe: รับประกันว่าหน้าโหลดจะถูกปิดทิ้งเสมอ ไม่ว่าจะสำเร็จหรือพังก็ตาม
-            }
+                alert("การเชื่อมต่อขัดข้อง หรือใช้เวลาดึงข้อมูลนานเกินไป");
+            } finally { hideLoading(); }
         }
 
         function openLoginModal() { document.getElementById('loginModal').classList.remove('hidden'); }
         function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden'); document.getElementById('loginError').classList.add('hidden'); }
         function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
-        function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ"; document.getElementById('btnLogin').disabled = false;}
+        function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ"; document.getElementById('btnLogin').disabled = false; }
 
         // ==========================================
         // 1. NLP-Lite Extractor
@@ -429,9 +383,6 @@
             return highlighted;
         }
 
-        // ==========================================
-        // 2. Data Initialization & Fiscal Year Logic
-        // ==========================================
         const filterFields = { 'ปีงบประมาณ': 'filterFY', 'ไตรมาส': 'filterFQ', 'สถานะ': 'filterStatus', 'สถานที่': 'filterLocation', 'ระดับ': 'filterLevel', 'หน่วยงานที่เกี่ยวข้อง': 'filterDept', 'รายการ': 'filterItem', 'Phase': 'filterPhase' };
         const tsConfig = { plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'title', searchField: 'title', placeholder: 'ทั้งหมด', onChange: function() { applyFilters(); } };
         const thaiMonthsShort = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -494,17 +445,18 @@
                     currentFilteredData = [...rawData]; initDateRange(); initSlicers();
                     document.getElementById('welcomeScreen').style.display = 'none'; document.getElementById('mainDashboard').style.display = 'block';
                     clearDrillDown(); 
-                } else { alert("ข้อมูลไม่สมบูรณ์ (คอลัมน์ 'วันที่เกิดเหตุ' อาจสูญหาย)"); }
+                } else { alert("ไม่พบข้อมูล (อาจไม่มีคอลัมน์ 'วันที่เกิดเหตุ')"); }
             } catch (err) {
-                console.error("Data Processing Error:", err);
                 alert("เกิดข้อผิดพลาดในการจัดเตรียมข้อมูล: " + err.message);
             }
         }
 
         function initDateRange() {
             const sortedInts = rawData.map(r => r._dateObj.intBE).sort((a, b) => a - b);
-            document.getElementById('startDate').value = rawData.find(r => r._dateObj.intBE === sortedInts[0])._dateObj.strCE;
-            document.getElementById('endDate').value = rawData.find(r => r._dateObj.intBE === sortedInts[sortedInts.length - 1])._dateObj.strCE;
+            const minDate = rawData.find(r => r._dateObj.intBE === sortedInts[0]);
+            const maxDate = rawData.find(r => r._dateObj.intBE === sortedInts[sortedInts.length - 1]);
+            document.getElementById('startDate').value = minDate ? minDate._dateObj.strCE : '';
+            document.getElementById('endDate').value = maxDate ? maxDate._dateObj.strCE : '';
         }
 
         function initSlicers() {
@@ -579,12 +531,14 @@
             const drugKeys = Object.keys(drugCounts); const topDrug = drugKeys.length > 0 ? drugKeys.reduce((a, b) => drugCounts[a] > drugCounts[b] ? a : b) : '-';
 
             document.getElementById('totalIncidents').innerText = total.toLocaleString(); document.getElementById('severeIncidents').innerText = severeCount.toLocaleString();
+            document.getElementById('severePercentMsg').innerText = `คิดเป็น ${total ? ((severeCount / total) * 100).toFixed(1) : 0}% ในช่วงเวลานี้`;
+
             document.getElementById('topError').innerText = topItem; document.getElementById('topErrorMsg').innerText = `พบในรายงาน ${topItem !== '-' ? itemCounts[topItem] : 0} ครั้ง`; document.getElementById('topErrorRaw').value = topItem;
             document.getElementById('topDrug').innerText = topDrug; document.getElementById('topDrugMsg').innerText = `พบในรายงาน ${topDrug !== '-' ? drugCounts[topDrug] : 0} ครั้ง`; document.getElementById('topDrugRaw').value = topDrug;
         }
 
         function renderChartsFromData(data) {
-            const itemCounts = {}; const drugCounts = {}; const relationData = {}; const allItemsFound = new Set(); 
+            const totalFiltered = data.length; const itemCounts = {}; const drugCounts = {}; const relationData = {}; const allItemsFound = new Set(); 
             data.forEach(r => {
                 const item = String(r['รายการ'] || '').trim() || 'ไม่ระบุ'; itemCounts[item] = (itemCounts[item] || 0) + 1;
                 r._baseDrugs.forEach(b => {
@@ -600,7 +554,7 @@
             renderRelationChart('relationChart', sortedDrugs, relationData, Array.from(allItemsFound));
         }
 
-        function renderChart(canvasId, type, labels, data, color, isHorizontal, filterType) {
+        function renderChart(canvasId, type, labels, data, color, isHorizontal, filterType, total) {
             const ctx = document.getElementById(canvasId).getContext('2d'); if (charts[canvasId]) charts[canvasId].destroy();
             charts[canvasId] = new Chart(ctx, {
                 type: type, data: { labels: labels, datasets: [{ data: data, backgroundColor: color + 'CC', borderColor: color, borderWidth: 1, borderRadius: 4 }] },
@@ -642,7 +596,7 @@
             let ipdVolAvg = parseFloat(document.getElementById('ipdVolume').value) || 1;
             
             let monthsSet = new Set();
-            activeData.forEach(r => { monthsSet.add(`${r._dateObj.year}-${r._dateObj.month.toString().padStart(2, '0')}`); });
+            activeData.forEach(r => { if(r._dateObj) monthsSet.add(`${r._dateObj.year}-${r._dateObj.month.toString().padStart(2, '0')}`); });
             let monthsArr = Array.from(monthsSet).sort();
             
             if (appMode === 'JVL') {
@@ -661,8 +615,8 @@
                 if (!['CPM201','CPM202','CPM203','CPM204','CPM205'].includes(nrls)) otherNrlsCounts[nrls] = (otherNrlsCounts[nrls] || 0) + 1;
             });
 
-            let totalOpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m] ? kpiVolumesDB[m].opd : 0), 0) : opdVolAvg;
-            let totalIpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m] ? kpiVolumesDB[m].ipd : 0), 0) : ipdVolAvg;
+            let totalOpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m]?.opd || 0), 0) : opdVolAvg;
+            let totalIpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m]?.ipd || 0), 0) : ipdVolAvg;
             if(totalOpdVol===0) totalOpdVol=1; if(totalIpdVol===0) totalIpdVol=1;
 
             const kpiDef = [
@@ -683,10 +637,10 @@
             });
 
             const runChartLabels = monthsArr.map(m => {
-                let p = m.split('-'); let fy = parseInt(p[0]); let mo = parseInt(p[1]);
+                let p = m.split('-'); let fy = parseInt(p[0]) || 0; let mo = parseInt(p[1]) || 1;
                 if (mo >= 10) fy += 1;
                 let q = mo >= 10 ? '1' : (mo <= 3 ? '2' : (mo <= 6 ? '3' : '4'));
-                return `${thaiMonthsShort[mo-1]} ${p[0].substring(2)} (Q${q}/${fy.toString().substring(2)})`;
+                return `${thaiMonthsShort[mo-1] || ''} ${p[0].substring(2)} (Q${q}/${fy.toString().substring(2)})`;
             });
 
             const kpiSteps = [{ id: 'CPM201', target: 10 }, { id: 'CPM202', target: 10 }, { id: 'CPM203', target: 30 }, { id: 'CPM204', target: 1 }, { id: 'CPM205', target: 1 }];
@@ -694,11 +648,11 @@
             kpiSteps.forEach(step => {
                 let opdData = []; let ipdData = []; let targetData = [];
                 monthsArr.forEach(m => {
-                    let opdCount = activeData.filter(r => `${r._dateObj.year}-${r._dateObj.month.toString().padStart(2,'0')}` === m && r['NRLS'] === step.id && getLocationType(r['สถานที่']) === 'OPD').length;
-                    let ipdCount = activeData.filter(r => `${r._dateObj.year}-${r._dateObj.month.toString().padStart(2,'0')}` === m && r['NRLS'] === step.id && getLocationType(r['สถานที่']) === 'IPD').length;
+                    let opdCount = activeData.filter(r => r._dateObj && `${r._dateObj.year}-${r._dateObj.month.toString().padStart(2,'0')}` === m && r['NRLS'] === step.id && getLocationType(r['สถานที่']) === 'OPD').length;
+                    let ipdCount = activeData.filter(r => r._dateObj && `${r._dateObj.year}-${r._dateObj.month.toString().padStart(2,'0')}` === m && r['NRLS'] === step.id && getLocationType(r['สถานที่']) === 'IPD').length;
                     
-                    let oVol = appMode === 'JVL' ? (kpiVolumesDB[m] ? kpiVolumesDB[m].opd : 1) : opdVolAvg;
-                    let iVol = appMode === 'JVL' ? (kpiVolumesDB[m] ? kpiVolumesDB[m].ipd : 1) : ipdVolAvg;
+                    let oVol = appMode === 'JVL' ? (kpiVolumesDB[m]?.opd || 1) : opdVolAvg;
+                    let iVol = appMode === 'JVL' ? (kpiVolumesDB[m]?.ipd || 1) : ipdVolAvg;
                     if(oVol===0) oVol=1; if(iVol===0) iVol=1;
 
                     opdData.push({ rate: ((opdCount*1000)/oVol).toFixed(2), count: opdCount, vol: oVol });
