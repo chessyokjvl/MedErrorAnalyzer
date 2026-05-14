@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JVL-RM Medication Error Analyzer</title>
+    <title>JVL-RM Rx Error NLP Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -38,18 +38,16 @@
         
         <div id="welcomeScreen" class="bg-white p-10 md:p-16 rounded-2xl shadow-sm border border-gray-100 text-center my-10 transition-all">
             <div class="text-7xl mb-6">💊</div>
-            <h1 class="text-3xl font-bold text-gray-800 mb-4">Medication Error Analyzer</h1>
+            <h1 class="text-3xl font-bold text-gray-800 mb-4">Medication Error NLP Analyzer</h1>
             <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-6 max-w-3xl mx-auto mb-8 text-left">
                 <h3 class="text-emerald-800 font-bold mb-2 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                    ระบบวิเคราะห์ความคลาดเคลื่อนทางยา (Cross-Filtering & Drug Grouper)
+                    ระบบประมวลผล KPI และ NLP ระบบยา
                 </h3>
                 <ul class="list-disc list-inside text-gray-700 space-y-2 text-sm md:text-base">
-                    <li>จัดกลุ่มชื่อยาอัตโนมัติ (เช่น หลอมรวมความแรงต่างๆ เข้าสู่ Generic Name) ในหน้า Dashboard</li>
-                    <li>เมื่อคลิกที่กราฟ ระบบจะทำ <b>Cross-Filtering</b> (กรองข้อมูลทุกส่วนบนหน้าจอให้สัมพันธ์กัน)</li>
-                    <li>พร้อมตาราง <b>Insight Report</b> อัตโนมัติ เพื่อนำไปสรุปผลและวางแผนป้องกัน</li>
-                    <li>เป็นเครื่องมือเสริมจากระบบบริหารความเสี่ยง <b>JVL-RM</b> รายงานเทพ เลือกเฉพาะด้าน "ระบบยา"</li>
-                    <li>เมื่อ Export File "God Report" มาเปิดด้วย Excel แล้วกด Save as type : <b>CSV UTF-8 (Comma Delimited)</b></li>
+                    <li>จัดกลุ่มชื่อยาและสกัดความแรงอัตโนมัติ (NLP-Lite Extractor)</li>
+                    <li>รองรับการคำนวณ KPI อุบัติการณ์ทางยา (Prescribing ถึง Administration)</li>
+                    <li>คำนวณอัตราต่อ 1,000 ใบสั่งยา (OPD) และ 1,000 วันนอน (IPD) ให้อัตโนมัติ</li>
                 </ul>
             </div>
             <label class="inline-block bg-emerald-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-emerald-700 cursor-pointer transition shadow-md">
@@ -63,7 +61,7 @@
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800">💊 Medication Error NLP Analyzer</h1>
-                    <p class="text-gray-500 text-sm">ระบบวิเคราะห์และสกัดข้อมูลความคลาดเคลื่อนทางยาเชิงลึก</p>
+                    <p class="text-gray-500 text-sm">ระบบวิเคราะห์และสกัดข้อมูลความคลาดเคลื่อนทางยาเชิงลึก & KPI Tracking</p>
                 </div>
                 <label class="cursor-pointer bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-5 py-2.5 rounded-xl text-sm font-semibold transition border border-emerald-200 shadow-sm flex items-center gap-2">
                     <span id="headerFileName">เปลี่ยนไฟล์ CSV</span>
@@ -103,34 +101,68 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="summaryCards">
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-emerald-100 border-l-4 border-l-emerald-500">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-emerald-100 border-l-4 border-l-emerald-500 card-clickable" onclick="triggerDrillDown('all', 'ทั้งหมด')">
                     <h3 class="text-gray-500 text-xs font-medium">ความคลาดเคลื่อนทั้งหมด</h3>
                     <p class="text-3xl font-bold text-gray-800 mt-1" id="totalIncidents">0</p>
                     <p class="text-xs text-emerald-500 mt-1 font-medium" id="totalPercentMsg"></p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-red-100 border-l-4 border-l-red-500 card-clickable" onclick="triggerDrillDown('severe', 'E,F,G,H,I')">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-red-100 border-l-4 border-l-red-500 card-clickable" id="severeCard">
                     <h3 class="text-gray-500 text-xs font-medium">ระดับ E ขึ้นไป</h3>
                     <p class="text-3xl font-bold text-gray-800 mt-1" id="severeIncidents">0</p>
                     <p class="text-xs text-red-500 mt-1 font-medium" id="severePercentMsg"></p>
-                    <p class="text-[10px] text-gray-400 mt-1">👆 คลิกเพื่อกรองข้อมูล</p>
+                    <p class="text-[10px] text-gray-400 mt-1">👆 คลิกเพื่อดูตาราง</p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-blue-100 border-l-4 border-l-blue-500 card-clickable" onclick="triggerDrillDown('errorType', document.getElementById('topErrorRaw').value)">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-blue-100 border-l-4 border-l-blue-500 card-clickable" id="topErrorCard">
                     <h3 class="text-gray-500 text-xs font-medium">ประเภทที่ผิดบ่อยสุด</h3>
                     <p class="text-lg font-bold text-blue-700 mt-1 truncate" id="topError">-</p>
                     <p class="text-xs text-blue-500 mt-1 font-medium" id="topErrorMsg"></p>
                     <input type="hidden" id="topErrorRaw" value="">
-                    <p class="text-[10px] text-blue-400 mt-1">👆 คลิกเพื่อกรองข้อมูล</p>
+                    <p class="text-[10px] text-blue-400 mt-1">👆 คลิกเพื่อดูตาราง</p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-amber-500 card-clickable" onclick="triggerDrillDown('drug', document.getElementById('topDrugRaw').value)">
-                    <h3 class="text-gray-500 text-xs font-medium">กลุ่มยาที่มีปัญหามากสุด</h3>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-amber-500 card-clickable" id="topDrugCard">
+                    <h3 class="text-gray-500 text-xs font-medium">ยาที่ตรวจพบปัญหามากสุด</h3>
                     <p class="text-lg font-bold text-amber-700 mt-1 truncate" id="topDrug">-</p>
                     <p class="text-xs text-amber-600 mt-1 font-medium" id="topDrugMsg"></p>
                     <input type="hidden" id="topDrugRaw" value="">
-                    <p class="text-[10px] text-amber-400 mt-1">👆 คลิกเพื่อกรองข้อมูล</p>
+                    <p class="text-[10px] text-amber-400 mt-1">👆 คลิกเพื่อดูตาราง</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="dashboardArea">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-rose-200 mt-4" id="kpiSection">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="bg-rose-100 p-2 rounded-lg text-rose-700 font-bold">KPI Dashboard</div>
+                        <h3 class="font-bold text-gray-700 text-lg">รายงานเป้าหมายความคลาดเคลื่อนทางยา</h3>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-bold text-gray-700">ใบสั่งยา (OPD):</label>
+                            <input type="number" id="opdVolume" value="1000" class="w-24 border border-gray-300 rounded p-1 text-sm text-center focus:outline-none focus:border-rose-400" oninput="calculateKPIs()">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-bold text-gray-700">วันนอน (IPD):</label>
+                            <input type="number" id="ipdVolume" value="1000" class="w-24 border border-gray-300 rounded p-1 text-sm text-center focus:outline-none focus:border-rose-400" oninput="calculateKPIs()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left border-collapse">
+                        <thead>
+                            <tr class="bg-rose-50 text-rose-800">
+                                <th class="p-2 border font-bold">รายการ KPI (NRLS)</th>
+                                <th class="p-2 border text-center font-bold">เป้าหมาย</th>
+                                <th class="p-2 border text-center font-bold">จำนวนเกิดเหตุ (ครั้ง)</th>
+                                <th class="p-2 border text-center font-bold">ผลลัพธ์ (อัตราส่วน)</th>
+                                <th class="p-2 border text-center font-bold">ประเมินผล</th>
+                            </tr>
+                        </thead>
+                        <tbody id="kpiTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4" id="dashboardArea">
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100"><h3 class="font-bold text-gray-700 mb-2 text-xs">ประเภทความคลาดเคลื่อน (Top 10)</h3><div class="chart-container"><canvas id="errorTypeChart"></canvas></div></div>
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100"><h3 class="font-bold text-emerald-700 mb-2 text-xs">💊 กลุ่มยาที่พบปัญหาบ่อยที่สุด (Top 15)</h3><div class="chart-container"><canvas id="drugChart"></canvas></div></div>
                 
@@ -148,7 +180,6 @@
                     <h3 class="font-bold text-gray-700 text-lg">ตารางสรุปความสัมพันธ์ (กลุ่มยา x ประเภทความคลาดเคลื่อน)</h3>
                 </div>
                 <p class="text-xs text-indigo-600 mb-4 font-medium">* ตารางนี้จะสรุปความสัมพันธ์ของข้อมูลที่แสดงอยู่บน Dashboard ให้โดยอัตโนมัติ พร้อมสัดส่วนร้อยละ สำหรับนำไปจัดทำรายงาน</p>
-                
                 <div class="overflow-x-auto">
                     <table id="insightTable" class="w-full text-sm text-left border-collapse">
                         <thead>
@@ -170,7 +201,6 @@
                     <h3 class="font-bold text-gray-700 text-lg" id="tableTitle">ตารางเจาะลึกความคลาดเคลื่อนทางยา</h3>
                 </div>
                 <p class="text-xs text-emerald-600 mb-4 font-medium">* ตารางนี้แสดงรายละเอียดเชิงลึกและ <b>ความแรงของยาที่เกิดปัญหาจริง (Specific Strengths)</b> ตามที่ถูกสกัดมาจากรายละเอียด</p>
-                
                 <div class="overflow-x-auto">
                     <table id="nlpTable" class="w-full text-xs text-left border-collapse">
                         <thead>
@@ -207,14 +237,12 @@
         // 1. NLP-Lite Extractor & Base Name Grouper
         // ==========================================
         
-        // เพิ่ม acid, inj, injection, syr, syrup, tablet, capsule เข้าไปใน stopwords
         const stopwords = [
             'ipd', 'opd', 'med', 'medsheet', 'sheet', 'stat', 'prn', 'and', 'the', 'for', 'home', 'ward', 'doctor', 'nurse', 'pharmacy', 'error', 'type', 'order', 'iv', 'im', 'po', 'pc', 'ac', 'hs', 'od', 'bid', 'tid', 'qid', 'sig', 'tab', 'cap', 'mg', 'ml', 'g',
             'hold', 'ect', 'robot', 'tray', 'sts', 'lai', 'admit', 'drug', 'profile', 'mar', 'off', 'oral',
             'acid', 'inj', 'injection', 'syr', 'syrup', 'tablet', 'capsule'
         ];
 
-        // เพิ่ม 'folic acid' เข้า Dictionary เพื่อให้จับคำประสมได้สมบูรณ์
         const drugDictionary = {
             'a2': 'Trihexyphenidyl 2 mg', 'benz2': 'Trihexyphenidyl 2 mg', 'benzhexol2': 'Trihexyphenidyl 2 mg', 'aca': 'Trihexyphenidyl', 'trihex': 'Trihexyphenidyl',
             'a5': 'Trihexyphenidyl 5 mg', 'benz5': 'Trihexyphenidyl 5 mg', 'benzhexol5': 'Trihexyphenidyl 5 mg',
@@ -314,9 +342,41 @@
         }
 
         // ==========================================
-        // 2. Data Initialization
+        // 2. NRLS Mapping & Location Logic for KPI
         // ==========================================
-        
+        const nrlsFullDict = {
+            'CPM101': 'แพ้ยาซ้ำ',
+            'CPM102': 'ไม่ปฏิบัติตาม Guideline High Alert Drug',
+            'CPM103': 'ภาวะแทรกซ้อนที่ป้องกันได้จาก High Alert Drug',
+            'CPM104': 'Mis selection of strong potassium',
+            'CPM105': 'แพ้ยา (ยกเว้นแพ้ยาซ้ำ)/ADE ระดับ E ขึ้นไป',
+            'CPM106': 'ไม่ปฏิบัติตาม Guideline Fatal Drug',
+            'CPM107': 'ผู้ป่วยได้รับยาที่มีคู่ยาปฏิกิริยารุนแรง',
+            'CPM201': 'Prescribing Error (สั่งใช้ยา)',
+            'CPM202': 'Transcribing Error (คัดลอกยา)',
+            'CPM203': 'Pre-dispensing Error (จัดเตรียมจ่ายยา)',
+            'CPM204': 'Dispensing Error (จ่ายยา)',
+            'CPM205': 'Administration Error (ให้ยา)',
+            'CPM206': 'ไม่ปฏิบัติตาม Guideline Look-Alike Sound-Alike',
+            'CPM207': 'ผู้ป่วยได้รับยาในกลุ่ม Look-Alike Sound-Alike',
+            'CPM208': 'ไม่ปฏิบัติตามมาตรฐานการใช้ยา (อื่นๆ)',
+            'CPM301': 'ไม่ปฏิบัติตาม Guideline Med Rec',
+            'CPM302': 'ผู้ป่วยไม่ได้รับยาเดิมจากไม่ได้ทำ Med Rec',
+            'CPM303': 'ผู้ป่วยได้รับยาซ้ำซ้อนจากไม่ได้ทำ Med Rec',
+            'CPM304': 'ได้รับยาที่มีปฏิกิริยากันจากไม่ได้ทำ Med Rec',
+            'CPM401': 'ไม่ปฏิบัติตาม Guideline Rational Drug Use',
+            'CPM402': 'การใช้ยาปฏิชีวนะในโรคติดเชื้อทางเดินหายใจฯ',
+            'CPM403': 'การใช้ยาปฏิชีวนะในโรคอุจจาระร่วงเฉียบพลัน',
+            'CPM404': 'การใช้ยาอย่างไม่สมเหตุผล (ยกเว้นยาปฏิชีวนะ)'
+        };
+
+        function getLocationType(loc) {
+            if (!loc) return 'OTHER';
+            if (loc.includes('กระบวนการผู้ป่วยนอก') || loc.includes('ตึกอำนวยการชั้น1')) return 'OPD';
+            if (loc.includes('กระบวนการผู้ป่วยใน') || loc.includes('ตึกผู้ป่วยใน 5 ชั้น')) return 'IPD';
+            return 'OTHER';
+        }
+
         const filterFields = {
             'สถานะ': 'filterStatus', 'สถานที่': 'filterLocation', 'ระดับ': 'filterLevel',
             'หน่วยงานที่เกี่ยวข้อง': 'filterDept', 'รายการ': 'filterItem', 'Phase': 'filterPhase'
@@ -371,9 +431,7 @@
                         let rawLvl = String(row['ระดับ'] || '').trim().toUpperCase();
                         row._level = rawLvl !== '' ? rawLvl : 'ไม่ระบุ';
                         row._extractedDrugs = extractDrugs(row['รายละเอียด']);
-                        
                         row._baseDrugs = [...new Set(row._extractedDrugs.map(d => getBaseDrugName(d)))];
-                        
                         return row;
                     }).filter(row => row._dateObj !== null);
 
@@ -436,10 +494,6 @@
             clearDrillDown();
         }
 
-        // ==========================================
-        // 3. Centralized Dashboard Updater (Cross-Filtering)
-        // ==========================================
-        
         function triggerDrillDown(type, label) {
             currentDrillDown = { type: type, label: label };
             updateDashboard();
@@ -466,6 +520,9 @@
                 } else if (type === 'drug') {
                     activeData = currentFilteredData.filter(r => r._baseDrugs.includes(label));
                     alertText = `กลุ่มยาที่เกี่ยวข้อง: ${label}`;
+                } else if (type === 'all') {
+                    activeData = [...currentFilteredData];
+                    alertText = `ข้อมูลทั้งหมด`;
                 } else {
                     activeData = [...currentFilteredData];
                 }
@@ -480,6 +537,7 @@
             renderSummaryCards(activeData);
             renderChartsFromData(activeData);
             renderInsightReport(activeData);
+            calculateKPIs(); // ดึง activeData ไปคำนวณ KPI ต่อ
             renderNLPTable(activeData);
         }
 
@@ -494,7 +552,6 @@
             data.forEach(row => {
                 const item = String(row['รายการ'] || '').trim() || 'ไม่ระบุ';
                 itemCounts[item] = (itemCounts[item] || 0) + 1;
-
                 row._baseDrugs.forEach(baseName => {
                     drugCounts[baseName] = (drugCounts[baseName] || 0) + 1;
                 });
@@ -621,9 +678,96 @@
         }
 
         // ==========================================
-        // 4. Insight Report & NLP Tables
+        // 5. KPI & Reports Module
         // ==========================================
-        
+
+        function calculateKPIs() {
+            const opdVol = parseFloat(document.getElementById('opdVolume').value) || 1;
+            const ipdVol = parseFloat(document.getElementById('ipdVolume').value) || 1;
+
+            let counts = {};
+            let otherNrlsCounts = {};
+
+            activeData.forEach(r => {
+                let nrls = String(r['NRLS'] || '').trim();
+                if (!nrls) return;
+
+                let locType = getLocationType(r['สถานที่']);
+                let key = nrls + '_' + locType;
+                counts[key] = (counts[key] || 0) + 1;
+
+                // แยกนับรายการที่ไม่อยู่ใน 10 KPI หลัก
+                if (!['CPM201','CPM202','CPM203','CPM204','CPM205'].includes(nrls)) {
+                    otherNrlsCounts[nrls] = (otherNrlsCounts[nrls] || 0) + 1;
+                }
+            });
+
+            // 10 ตัวชี้วัดบังคับโชว์
+            const kpiDef = [
+                { id: 'CPM201_OPD', name: 'Prescribing Error OPD', nrlsName: 'Medication error : Prescribing', targetText: '< 10 ต่อ 1000 ใบสั่งยา', limit: 10, vol: opdVol },
+                { id: 'CPM201_IPD', name: 'Prescribing Error IPD', nrlsName: 'Medication error : Prescribing', targetText: '< 10 ต่อ 1000 วันนอน', limit: 10, vol: ipdVol },
+                { id: 'CPM202_OPD', name: 'Transcribing Error OPD', nrlsName: 'Medication error : Transcribing', targetText: '< 10 ต่อ 1000 ใบสั่งยา', limit: 10, vol: opdVol },
+                { id: 'CPM202_IPD', name: 'Transcribing Error IPD', nrlsName: 'Medication error : Transcribing', targetText: '< 10 ต่อ 1000 วันนอน', limit: 10, vol: ipdVol },
+                { id: 'CPM203_OPD', name: 'Pre-Dispensing Error OPD', nrlsName: 'Medication error : Pre-dispensing', targetText: '< 30 ต่อ 1000 ใบสั่งยา', limit: 30, vol: opdVol },
+                { id: 'CPM203_IPD', name: 'Pre-Dispensing Error IPD', nrlsName: 'Medication error : Pre-dispensing', targetText: '< 30 ต่อ 1000 วันนอน', limit: 30, vol: ipdVol },
+                { id: 'CPM204_OPD', name: 'Dispensing Error OPD', nrlsName: 'Medication error : Dispensing', targetText: '< 1 ต่อ 1000 ใบสั่งยา', limit: 1, vol: opdVol },
+                { id: 'CPM204_IPD', name: 'Dispensing Error IPD', nrlsName: 'Medication error : Dispensing', targetText: '< 1 ต่อ 1000 วันนอน', limit: 1, vol: ipdVol },
+                { id: 'CPM205_OPD', name: 'Administration Error OPD', nrlsName: 'Medication error : Administration', targetText: '< 1 ต่อ 1000 ใบสั่งยา', limit: 1, vol: opdVol },
+                { id: 'CPM205_IPD', name: 'Administration Error IPD', nrlsName: 'Medication error : Administration', targetText: '< 1 ต่อ 1000 วันนอน', limit: 1, vol: ipdVol }
+            ];
+
+            const tbody = document.getElementById('kpiTableBody');
+            tbody.innerHTML = '';
+
+            // Render 10 KPIs
+            kpiDef.forEach(k => {
+                let count = counts[k.id] || 0;
+                let rate = (count * 1000) / k.vol;
+                
+                let isPass = rate <= k.limit;
+                let statusHtml = isPass 
+                    ? `<span class="bg-green-100 text-green-700 px-2 py-1 rounded font-bold">ผ่านเกณฑ์</span>` 
+                    : `<span class="bg-red-100 text-red-700 px-2 py-1 rounded font-bold">เกินเกณฑ์</span>`;
+
+                let tr = document.createElement('tr');
+                tr.classList.add('hover:bg-rose-50');
+                tr.innerHTML = `
+                    <td class="p-2 border">
+                        <div class="font-bold text-gray-800">${k.name}</div>
+                        <div class="text-[11px] text-gray-500">${k.nrlsName}</div>
+                    </td>
+                    <td class="p-2 border text-center text-rose-700 font-medium">${k.targetText}</td>
+                    <td class="p-2 border text-center font-bold text-gray-800">${count}</td>
+                    <td class="p-2 border text-center font-bold ${isPass ? 'text-green-600' : 'text-red-600'}">${rate.toFixed(2)}</td>
+                    <td class="p-2 border text-center">${statusHtml}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Render Other NRLS (เฉพาะที่มียอด > 0)
+            let otherKeys = Object.keys(otherNrlsCounts).sort();
+            if (otherKeys.length > 0) {
+                let headerRow = document.createElement('tr');
+                headerRow.innerHTML = `<td colspan="5" class="bg-gray-100 p-2 font-bold text-gray-700 text-center">รหัส NRLS อื่นๆ ที่พบในช่วงเวลานี้</td>`;
+                tbody.appendChild(headerRow);
+
+                otherKeys.forEach(nrls => {
+                    let count = otherNrlsCounts[nrls];
+                    let nrlsName = nrlsFullDict[nrls] || 'N/A';
+                    let tr = document.createElement('tr');
+                    tr.classList.add('hover:bg-gray-50');
+                    tr.innerHTML = `
+                        <td class="p-2 border"><div class="font-bold text-gray-700">[${nrls}]</div><div class="text-[11px] text-gray-500">${nrlsName}</div></td>
+                        <td class="p-2 border text-center text-gray-400">-</td>
+                        <td class="p-2 border text-center font-bold text-gray-800">${count}</td>
+                        <td class="p-2 border text-center text-gray-400">-</td>
+                        <td class="p-2 border text-center text-gray-400">-</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
         function renderInsightReport(data) {
             if (insightTableInstance) insightTableInstance.destroy();
             
@@ -632,10 +776,9 @@
 
             data.forEach(r => {
                 let item = String(r['รายการ'] || '').trim() || 'ไม่ระบุ';
-                
                 if (r._baseDrugs.length === 0) {
                     let key = 'ไม่พบชื่อยา|||' + item;
-                    if (!insightData[key]) insightData[key] = { baseDrug: 'ไม่พบชื่อยา (ตรวจสอบในตารางล่าง)', item: item, count: 0 };
+                    if (!insightData[key]) insightData[key] = { baseDrug: 'ไม่พบชื่อยา', item: item, count: 0 };
                     insightData[key].count++;
                 } else {
                     r._baseDrugs.forEach(baseDrug => {
@@ -678,7 +821,6 @@
 
         function renderNLPTable(data) {
             if (nlpTableInstance) nlpTableInstance.destroy();
-            
             const body = document.getElementById('nlpTableBody');
             body.innerHTML = '';
             
@@ -710,7 +852,7 @@
 
             nlpTableInstance = $('#nlpTable').DataTable({
                 dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"l<"flex"Bf>>rtip',
-                pageLength: 20,
+                pageLength: 10,
                 lengthMenu: [[10, 20, 50, 100, -1], ["10 แถว", "20 แถว", "50 แถว", "100 แถว", "ทั้งหมด"]],
                 buttons: [
                     { extend: 'excel', text: '📥 Export Excel (เจาะลึก)', className: 'bg-emerald-600 text-white rounded px-3 py-1 text-xs ml-2 border-0 shadow-sm hover:bg-emerald-700' },
