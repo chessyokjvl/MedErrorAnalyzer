@@ -57,20 +57,18 @@
     <div id="loadingOverlay" class="fixed inset-0 z-[60] bg-white bg-opacity-90 flex flex-col items-center justify-center hidden">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-600 mb-4"></div>
         <h2 class="text-xl font-bold text-gray-800">กำลังประมวลผลข้อมูล...</h2>
-        <p class="text-gray-500">ระบบ AI กำลังวิเคราะห์ข้อมูล กรุณารอสักครู่</p>
+        <p class="text-gray-500">ระบบ API กำลังดึงข้อมูลจากฐานข้อมูล กรุณารอสักครู่</p>
     </div>
 
     <main class="max-w-7xl mx-auto space-y-4 w-full">
-        
         <div id="welcomeScreen" class="bg-white p-10 md:p-16 rounded-2xl shadow-sm border border-gray-100 text-center my-10">
             <div class="text-7xl mb-6">💊</div>
             <h1 class="text-3xl font-bold text-gray-800 mb-4">Medication Error NLP Analyzer</h1>
             <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-6 max-w-3xl mx-auto mb-8 text-left">
-                <h3 class="text-emerald-800 font-bold mb-2 flex items-center gap-2">✨ อัปเดตใหม่: Executive Run Charts</h3>
+                <h3 class="text-emerald-800 font-bold mb-2 flex items-center gap-2">✨ JVL Hybrid Cloud System</h3>
                 <ul class="list-disc list-inside text-gray-700 space-y-2 text-sm md:text-base">
                     <li>รองรับระบบ <b>ปีงบประมาณและไตรมาส</b> อย่างสมบูรณ์แบบ</li>
-                    <li>เพิ่มกราฟ Run Chart แสดงแนวโน้ม KPI รายเดือนแบบมีเส้นเป้าหมายกำกับ</li>
-                    <li>ตาราง KPI คลิกเพื่อ Drill-down เจาะลึกถึงเคสจริงได้ทันที</li>
+                    <li>เชื่อมต่อ API ข้าม Server ได้อย่างปลอดภัยผ่านระบบ Fetch</li>
                 </ul>
             </div>
             <div class="flex flex-col md:flex-row justify-center gap-4">
@@ -243,9 +241,14 @@
     </main>
 
     <script>
-        // Register ChartDataLabels plugin
+        // ==========================================
+        // 🚀 URL ของ Google Apps Script ที่ Deploy ไว้
+        // นำลิงก์ของคุณมาใส่ตรงนี้ได้เลยครับ!
+        // ==========================================
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbxc0Xk_LTKAJ84QkvdckyjJE6-iR6eTZz9CVvqBqYAkYM6YYlcu395_qHGQApVFTgE/exec";
+
         Chart.register(ChartDataLabels);
-        Chart.defaults.set('plugins.datalabels', { display: false }); // Default ปิดไว้ ค่อยเปิดเฉพาะ Run Chart
+        Chart.defaults.set('plugins.datalabels', { display: false });
 
         let appMode = 'CSV'; 
         let kpiVolumesDB = {}; 
@@ -260,8 +263,85 @@
         let insightTableInstance = null;
         let tomSelects = {}; 
         
+        // ------------------------------------------
+        // API Fetch Functions สำหรับเชื่อม GAS แบบข้ามโดเมน
+        // ------------------------------------------
+        async function executeLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            
+            if(!u || !p) {
+                document.getElementById('loginError').innerText = "กรุณากรอก Username และ Password";
+                document.getElementById('loginError').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('btnLogin').innerText = "กำลังตรวจสอบกับระบบ...";
+            document.getElementById('btnLogin').disabled = true;
+
+            try {
+                let response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'login', username: u, password: p })
+                    // ไม่ต้องใส่ headers Content-Type ป้องกันปัญหา CORS Preflight
+                });
+                
+                let res = await response.json();
+                
+                if(res.success) {
+                    closeLoginModal();
+                    loadJVLData();
+                } else {
+                    document.getElementById('loginError').innerText = res.message;
+                    document.getElementById('loginError').classList.remove('hidden');
+                    document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ";
+                    document.getElementById('btnLogin').disabled = false;
+                }
+            } catch (error) {
+                document.getElementById('loginError').innerText = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ URL หรือการตั้งค่าอินเทอร์เน็ต";
+                document.getElementById('loginError').classList.remove('hidden');
+                document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ";
+                document.getElementById('btnLogin').disabled = false;
+            }
+        }
+
+        async function loadJVLData() {
+            showLoading();
+            try {
+                let response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'getData' })
+                });
+                
+                let res = await response.json();
+                
+                if(res.success) {
+                    appMode = 'JVL';
+                    kpiVolumesDB = res.data.volumes;
+                    document.getElementById('systemModeBadge').innerText = "JVL Database";
+                    document.getElementById('systemModeBadge').classList.replace('bg-gray-200', 'bg-blue-600');
+                    document.getElementById('systemModeBadge').classList.replace('text-gray-700', 'text-white');
+                    document.getElementById('btnChangeCSV').style.display = 'none';
+                    
+                    processRawDataArray(res.data.errors);
+                    hideLoading();
+                } else {
+                    alert("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + res.message);
+                    hideLoading();
+                }
+            } catch (error) {
+                alert("การเชื่อมต่อขัดข้อง ไม่สามารถดึงข้อมูลได้");
+                hideLoading();
+            }
+        }
+
+        function openLoginModal() { document.getElementById('loginModal').classList.remove('hidden'); }
+        function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden'); document.getElementById('loginError').classList.add('hidden'); }
+        function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
+        function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+
         // ==========================================
-        // 1. NLP-Lite Extractor & Base Name Grouper
+        // 1. NLP-Lite Extractor
         // ==========================================
         const stopwords = ['ipd', 'opd', 'med', 'medsheet', 'sheet', 'stat', 'prn', 'and', 'the', 'for', 'home', 'ward', 'doctor', 'nurse', 'pharmacy', 'error', 'type', 'order', 'iv', 'im', 'po', 'pc', 'ac', 'hs', 'od', 'bid', 'tid', 'qid', 'sig', 'tab', 'cap', 'mg', 'ml', 'g', 'hold', 'ect', 'robot', 'tray', 'sts', 'lai', 'admit', 'drug', 'profile', 'mar', 'off', 'oral', 'acid', 'inj', 'injection', 'syr', 'syrup', 'tablet', 'capsule'];
         const drugDictionary = {'a2': 'Trihexyphenidyl 2 mg', 'benz2': 'Trihexyphenidyl 2 mg', 'benzhexol2': 'Trihexyphenidyl 2 mg', 'aca': 'Trihexyphenidyl', 'trihex': 'Trihexyphenidyl', 'a5': 'Trihexyphenidyl 5 mg', 'benz5': 'Trihexyphenidyl 5 mg', 'benzhexol5': 'Trihexyphenidyl 5 mg', 'ris': 'Risperidone', 'ris1': 'Risperidone 1 mg', 'ris2': 'Risperidone 2 mg', 'valium': 'Diazepam 10 mg injection', 'dzp': 'Diazepam', 'dpz': 'Diazepam', 'd2': 'Diazepam 2 mg', 'd5': 'Diazepam 5 mg', 'd10': 'Diazepam 10 mg', 'halo': 'Haloperidol', 'halo dec': 'Haloperidol Decanoate', 'halodec': 'Haloperidol Decanoate', 'vpa': 'Sodium Valproate', 'sod val': 'Sodium Valproate', 'sodval': 'Sodium Valproate', 'veltila': 'Sodium Valproate 500 mg', 'depakin': 'Sodium Valproate', 'dep cr': 'Sodium Valproate', 'dcf': 'Diclofenac', 'vitamin b1': 'Vitamin B1', 'vit b1': 'Vitamin B1', 'vitb1': 'Vitamin B1', 'thiamine': 'Vitamin B1', 'amlo': 'Amlodipine', 'atorvas': 'Atorvastatin', 'cpz': 'Chlorpromazine', 'lora': 'Lorazepam', 't5': 'Clorazepate 5 mg', 'tranxene': 'Clorazepate 5 mg', 'ritalin': 'Methylphenidate', 'rubifen': 'Methylphenidate', 'concertra': 'Methylphenidate', 'clozapine': 'Clozapine', 'mianserin': 'Mianserin', 'nortriptyline': 'Nortriptyline', 'amitriptyline': 'Amitriptyline', 'trazodone': 'Trazodone', 'quetiapine': 'Quetiapine', 'folic acid': 'Folic acid', 'folic': 'Folic acid'};
@@ -325,9 +405,6 @@
             return highlighted;
         }
 
-        // ==========================================
-        // 2. Data Initialization & Fiscal Year Logic
-        // ==========================================
         const filterFields = { 'ปีงบประมาณ': 'filterFY', 'ไตรมาส': 'filterFQ', 'สถานะ': 'filterStatus', 'สถานที่': 'filterLocation', 'ระดับ': 'filterLevel', 'หน่วยงานที่เกี่ยวข้อง': 'filterDept', 'รายการ': 'filterItem', 'Phase': 'filterPhase' };
         const tsConfig = { plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'title', searchField: 'title', placeholder: 'ทั้งหมด', onChange: function() { applyFilters(); } };
         const thaiMonthsShort = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -351,44 +428,11 @@
                 }
                 if (y < 100) y += 2500; else if (y >= 1900 && y <= 2100) y += 543; else if (y > 3000) y -= 543; 
                 
-                // คำนวณ ปีงบประมาณ และ ไตรมาส
                 let fy = y; if(m >= 10) fy += 1;
                 let fq = m >= 10 ? 'Q1' : (m >= 1 && m <= 3 ? 'Q2' : (m >= 4 && m <= 6 ? 'Q3' : 'Q4'));
 
                 return { strCE: `${y - 543}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`, intBE: (y * 10000) + (m * 100) + d, year: y, month: m, day: d, fy: fy.toString(), fq: fq };
             } catch (e) { return null; }
-        }
-
-        // ==========================================
-        // Modal & Fetching
-        // ==========================================
-        function openLoginModal() { document.getElementById('loginModal').classList.remove('hidden'); }
-        function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden'); document.getElementById('loginError').classList.add('hidden'); }
-        function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
-        function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
-
-        function executeLogin() {
-            const u = document.getElementById('username').value; const p = document.getElementById('password').value;
-            if(!u || !p) { document.getElementById('loginError').innerText = "กรุณากรอกให้ครบ"; document.getElementById('loginError').classList.remove('hidden'); return; }
-            document.getElementById('btnLogin').innerText = "กำลังเข้าสู่ระบบ..."; document.getElementById('btnLogin').disabled = true;
-            
-            google.script.run.withSuccessHandler(res => {
-                if(res.success) { closeLoginModal(); loadJVLData(); } 
-                else { document.getElementById('loginError').innerText = res.message; document.getElementById('loginError').classList.remove('hidden'); document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ"; document.getElementById('btnLogin').disabled = false; }
-            }).checkLogin(u, p);
-        }
-
-        function loadJVLData() {
-            showLoading();
-            google.script.run.withSuccessHandler(res => {
-                appMode = 'JVL'; kpiVolumesDB = res.volumes;
-                document.getElementById('systemModeBadge').innerText = "JVL Database";
-                document.getElementById('systemModeBadge').classList.replace('bg-gray-200', 'bg-blue-600');
-                document.getElementById('systemModeBadge').classList.replace('text-gray-700', 'text-white');
-                document.getElementById('btnChangeCSV').style.display = 'none';
-                processRawDataArray(res.errors);
-                hideLoading();
-            }).getJVLDatabase();
         }
 
         document.getElementById('csvFileMain').addEventListener('change', handleCSVUpload);
@@ -416,7 +460,7 @@
                 currentFilteredData = [...rawData]; initDateRange(); initSlicers();
                 document.getElementById('welcomeScreen').style.display = 'none'; document.getElementById('mainDashboard').style.display = 'block';
                 clearDrillDown(); 
-            } else { alert("ไม่พบข้อมูล"); }
+            } else { alert("ไม่พบข้อมูลที่สมบูรณ์"); }
         }
 
         function initDateRange() {
@@ -486,9 +530,6 @@
             renderSummaryCards(activeData); renderChartsFromData(activeData); calculateKPIs(); renderInsightReport(activeData); renderNLPTable(activeData);
         }
 
-        // ==========================================
-        // Rendering Functions
-        // ==========================================
         function renderSummaryCards(data) {
             const total = data.length; const severeCount = data.filter(r => ['E', 'F', 'G', 'H', 'I'].includes(r._level)).length;
             const itemCounts = {}; const drugCounts = {}; 
@@ -552,17 +593,13 @@
             });
         }
 
-        // ==========================================
-        // 5. KPI & Run Charts Module
-        // ==========================================
-        const nrlsFullDict = { 'CPM201': 'Prescribing', 'CPM202': 'Transcribing', 'CPM203': 'Pre-dispensing', 'CPM204': 'Dispensing', 'CPM205': 'Administration', 'CPM101': 'แพ้ยาซ้ำ', 'CPM102': 'ไม่ทำตาม GL High Alert Drug' }; // ย่อให้สั้น
+        const nrlsFullDict = { 'CPM201': 'Prescribing', 'CPM202': 'Transcribing', 'CPM203': 'Pre-dispensing', 'CPM204': 'Dispensing', 'CPM205': 'Administration', 'CPM101': 'แพ้ยาซ้ำ', 'CPM102': 'ไม่ทำตาม GL High Alert Drug' }; 
         function getLocationType(loc) { if(!loc) return 'OTHER'; if(loc.includes('นอก')||loc.includes('ชั้น1')) return 'OPD'; if(loc.includes('ใน')||loc.includes('ชั้น 5')||loc.includes('5 ชั้น')) return 'IPD'; return 'OTHER'; }
 
         function calculateKPIs() {
             let opdVolAvg = parseFloat(document.getElementById('opdVolume').value) || 1;
             let ipdVolAvg = parseFloat(document.getElementById('ipdVolume').value) || 1;
             
-            // หาเดือนทั้งหมดที่มีใน Filtered Data เพื่อใช้วาดแกน X ของ Run Chart (เรียงปีเดือน)
             let monthsSet = new Set();
             activeData.forEach(r => { monthsSet.add(`${r._dateObj.year}-${r._dateObj.month.toString().padStart(2, '0')}`); });
             let monthsArr = Array.from(monthsSet).sort();
@@ -575,7 +612,6 @@
                 document.getElementById('kpiAutoMsg').classList.add('hidden'); document.getElementById('kpiAutoMsg').classList.remove('flex');
             }
 
-            // นับรวมสำหรับ KPI Table หลัก
             let counts = {}; let otherNrlsCounts = {};
             activeData.forEach(r => {
                 let nrls = String(r['NRLS'] || '').trim(); if (!nrls) return;
@@ -584,7 +620,6 @@
                 if (!['CPM201','CPM202','CPM203','CPM204','CPM205'].includes(nrls)) otherNrlsCounts[nrls] = (otherNrlsCounts[nrls] || 0) + 1;
             });
 
-            // คำนวณ Volume รวมสำหรับตารางรวม (ถ้า CSV คือยอดที่กรอกตรงๆ)
             let totalOpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m] ? kpiVolumesDB[m].opd : 0), 0) : opdVolAvg;
             let totalIpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m] ? kpiVolumesDB[m].ipd : 0), 0) : ipdVolAvg;
             if(totalOpdVol===0) totalOpdVol=1; if(totalIpdVol===0) totalIpdVol=1;
@@ -606,7 +641,6 @@
                 tbody.appendChild(tr);
             });
 
-            // --- เตรียมวาด 5 Run Charts ---
             const runChartLabels = monthsArr.map(m => {
                 let p = m.split('-'); let fy = parseInt(p[0]); let mo = parseInt(p[1]);
                 if (mo >= 10) fy += 1;
@@ -621,11 +655,9 @@
             kpiSteps.forEach(step => {
                 let opdData = []; let ipdData = []; let targetData = [];
                 monthsArr.forEach(m => {
-                    // จำนวน Error รายเดือน
                     let opdCount = activeData.filter(r => `${r._dateObj.year}-${r._dateObj.month.toString().padStart(2,'0')}` === m && r['NRLS'] === step.id && getLocationType(r['สถานที่']) === 'OPD').length;
                     let ipdCount = activeData.filter(r => `${r._dateObj.year}-${r._dateObj.month.toString().padStart(2,'0')}` === m && r['NRLS'] === step.id && getLocationType(r['สถานที่']) === 'IPD').length;
                     
-                    // ปริมาณงานรายเดือน
                     let oVol = appMode === 'JVL' ? (kpiVolumesDB[m] ? kpiVolumesDB[m].opd : 1) : opdVolAvg;
                     let iVol = appMode === 'JVL' ? (kpiVolumesDB[m] ? kpiVolumesDB[m].ipd : 1) : ipdVolAvg;
                     if(oVol===0) oVol=1; if(iVol===0) iVol=1;
