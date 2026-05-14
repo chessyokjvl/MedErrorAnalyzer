@@ -262,16 +262,33 @@
         let nlpTableInstance = null;
         let insightTableInstance = null;
         let tomSelects = {}; 
+
+        // ==========================================
+        // 🚀 ระบบดักจับปุ่ม Enter สำหรับ Login
+        // ==========================================
+        document.getElementById('username').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('password').focus(); // เด้งไปช่องรหัสผ่าน
+            }
+        });
+
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                executeLogin(); // สั่ง Login ทันที
+            }
+        });
         
         // ------------------------------------------
-        // API Fetch Functions สำหรับเชื่อม GAS แบบข้ามโดเมน
+        // API Fetch Functions สำหรับเชื่อม GAS แบบข้ามโดเมน (อัปเกรด Failsafe)
         // ------------------------------------------
         async function executeLogin() {
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
             
             if(!u || !p) {
-                document.getElementById('loginError').innerText = "กรุณากรอก Username และ Password";
+                document.getElementById('loginError').innerText = "กรุณากรอก Username และ Password ให้ครบถ้วน";
                 document.getElementById('loginError').classList.remove('hidden');
                 return;
             }
@@ -282,8 +299,8 @@
             try {
                 let response = await fetch(GAS_URL, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // ป้องกันปัญหา CORS
                     body: JSON.stringify({ action: 'login', username: u, password: p })
-                    // ไม่ต้องใส่ headers Content-Type ป้องกันปัญหา CORS Preflight
                 });
                 
                 let res = await response.json();
@@ -298,7 +315,8 @@
                     document.getElementById('btnLogin').disabled = false;
                 }
             } catch (error) {
-                document.getElementById('loginError').innerText = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ URL หรือการตั้งค่าอินเทอร์เน็ต";
+                console.error("Login Error:", error);
+                document.getElementById('loginError').innerText = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ URL หรืออินเทอร์เน็ต";
                 document.getElementById('loginError').classList.remove('hidden');
                 document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ";
                 document.getElementById('btnLogin').disabled = false;
@@ -306,10 +324,11 @@
         }
 
         async function loadJVLData() {
-            showLoading();
+            showLoading(); // แสดงหน้าจอโหลด
             try {
                 let response = await fetch(GAS_URL, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // ป้องกันปัญหา CORS
                     body: JSON.stringify({ action: 'getData' })
                 });
                 
@@ -317,28 +336,33 @@
                 
                 if(res.success) {
                     appMode = 'JVL';
-                    kpiVolumesDB = res.data.volumes;
+                    kpiVolumesDB = res.data.volumes || {};
                     document.getElementById('systemModeBadge').innerText = "JVL Database";
                     document.getElementById('systemModeBadge').classList.replace('bg-gray-200', 'bg-blue-600');
                     document.getElementById('systemModeBadge').classList.replace('text-gray-700', 'text-white');
                     document.getElementById('btnChangeCSV').style.display = 'none';
                     
-                    processRawDataArray(res.data.errors);
-                    hideLoading();
+                    let dbErrors = res.data.errors || [];
+                    if (dbErrors.length > 0) {
+                        processRawDataArray(dbErrors);
+                    } else {
+                        alert("ไม่พบข้อมูลใน Sheet 'MedErrors' หรือฐานข้อมูลว่างเปล่า");
+                    }
                 } else {
                     alert("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + res.message);
-                    hideLoading();
                 }
             } catch (error) {
-                alert("การเชื่อมต่อขัดข้อง ไม่สามารถดึงข้อมูลได้");
-                hideLoading();
+                console.error("Data Fetch Error:", error);
+                alert("การเชื่อมต่อขัดข้อง หรือใช้เวลาดึงข้อมูลนานเกินไป (หากข้อมูลมีจำนวนมาก กรุณารอหรือตรวจสอบอินเทอร์เน็ต)");
+            } finally {
+                hideLoading(); // 🛡️ Failsafe: รับประกันว่าหน้าโหลดจะถูกปิดทิ้งเสมอ ไม่ว่าจะสำเร็จหรือพังก็ตาม
             }
         }
 
         function openLoginModal() { document.getElementById('loginModal').classList.remove('hidden'); }
         function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden'); document.getElementById('loginError').classList.add('hidden'); }
         function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
-        function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+        function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ"; document.getElementById('btnLogin').disabled = false;}
 
         // ==========================================
         // 1. NLP-Lite Extractor
@@ -405,6 +429,9 @@
             return highlighted;
         }
 
+        // ==========================================
+        // 2. Data Initialization & Fiscal Year Logic
+        // ==========================================
         const filterFields = { 'ปีงบประมาณ': 'filterFY', 'ไตรมาส': 'filterFQ', 'สถานะ': 'filterStatus', 'สถานที่': 'filterLocation', 'ระดับ': 'filterLevel', 'หน่วยงานที่เกี่ยวข้อง': 'filterDept', 'รายการ': 'filterItem', 'Phase': 'filterPhase' };
         const tsConfig = { plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'title', searchField: 'title', placeholder: 'ทั้งหมด', onChange: function() { applyFilters(); } };
         const thaiMonthsShort = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -443,24 +470,35 @@
             document.getElementById('headerFileName').innerText = "ไฟล์: " + file.name; showLoading();
             Papa.parse(file, {
                 header: true, skipEmptyLines: true, transformHeader: function(h) { return h.trim(); },
-                complete: function(results) { appMode = 'CSV'; document.getElementById('systemModeBadge').innerText = "CSV Upload"; document.getElementById('kpiManualMsg').classList.remove('hidden'); processRawDataArray(results.data); hideLoading(); }
+                complete: function(results) { 
+                    appMode = 'CSV'; 
+                    document.getElementById('systemModeBadge').innerText = "CSV Upload"; 
+                    document.getElementById('kpiManualMsg').classList.remove('hidden'); 
+                    processRawDataArray(results.data); 
+                    hideLoading(); 
+                }
             });
         }
 
         function processRawDataArray(dataArray) {
-            rawData = dataArray.map(row => {
-                row._dateObj = row['วันที่เกิดเหตุ'] ? normalizeDate(row['วันที่เกิดเหตุ']) : null;
-                let rawLvl = String(row['ระดับ'] || '').trim().toUpperCase(); row._level = rawLvl !== '' ? rawLvl : 'ไม่ระบุ';
-                row._extractedDrugs = extractDrugs(row['รายละเอียด']);
-                row._baseDrugs = [...new Set(row._extractedDrugs.map(d => getBaseDrugName(d)))];
-                return row;
-            }).filter(row => row._dateObj !== null);
+            try {
+                rawData = dataArray.map(row => {
+                    row._dateObj = row['วันที่เกิดเหตุ'] ? normalizeDate(row['วันที่เกิดเหตุ']) : null;
+                    let rawLvl = String(row['ระดับ'] || '').trim().toUpperCase(); row._level = rawLvl !== '' ? rawLvl : 'ไม่ระบุ';
+                    row._extractedDrugs = extractDrugs(row['รายละเอียด']);
+                    row._baseDrugs = [...new Set(row._extractedDrugs.map(d => getBaseDrugName(d)))];
+                    return row;
+                }).filter(row => row._dateObj !== null);
 
-            if (rawData.length > 0) {
-                currentFilteredData = [...rawData]; initDateRange(); initSlicers();
-                document.getElementById('welcomeScreen').style.display = 'none'; document.getElementById('mainDashboard').style.display = 'block';
-                clearDrillDown(); 
-            } else { alert("ไม่พบข้อมูลที่สมบูรณ์"); }
+                if (rawData.length > 0) {
+                    currentFilteredData = [...rawData]; initDateRange(); initSlicers();
+                    document.getElementById('welcomeScreen').style.display = 'none'; document.getElementById('mainDashboard').style.display = 'block';
+                    clearDrillDown(); 
+                } else { alert("ข้อมูลไม่สมบูรณ์ (คอลัมน์ 'วันที่เกิดเหตุ' อาจสูญหาย)"); }
+            } catch (err) {
+                console.error("Data Processing Error:", err);
+                alert("เกิดข้อผิดพลาดในการจัดเตรียมข้อมูล: " + err.message);
+            }
         }
 
         function initDateRange() {
@@ -593,6 +631,9 @@
             });
         }
 
+        // ==========================================
+        // 5. KPI & Run Charts Module
+        // ==========================================
         const nrlsFullDict = { 'CPM201': 'Prescribing', 'CPM202': 'Transcribing', 'CPM203': 'Pre-dispensing', 'CPM204': 'Dispensing', 'CPM205': 'Administration', 'CPM101': 'แพ้ยาซ้ำ', 'CPM102': 'ไม่ทำตาม GL High Alert Drug' }; 
         function getLocationType(loc) { if(!loc) return 'OTHER'; if(loc.includes('นอก')||loc.includes('ชั้น1')) return 'OPD'; if(loc.includes('ใน')||loc.includes('ชั้น 5')||loc.includes('5 ชั้น')) return 'IPD'; return 'OTHER'; }
 
@@ -648,9 +689,7 @@
                 return `${thaiMonthsShort[mo-1]} ${p[0].substring(2)} (Q${q}/${fy.toString().substring(2)})`;
             });
 
-            const kpiSteps = [
-                { id: 'CPM201', target: 10 }, { id: 'CPM202', target: 10 }, { id: 'CPM203', target: 30 }, { id: 'CPM204', target: 1 }, { id: 'CPM205', target: 1 }
-            ];
+            const kpiSteps = [{ id: 'CPM201', target: 10 }, { id: 'CPM202', target: 10 }, { id: 'CPM203', target: 30 }, { id: 'CPM204', target: 1 }, { id: 'CPM205', target: 1 }];
 
             kpiSteps.forEach(step => {
                 let opdData = []; let ipdData = []; let targetData = [];
