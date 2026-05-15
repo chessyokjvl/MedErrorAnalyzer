@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JVL-RM Rx Error NLP Analyzer</title>
+    <title>JVL-RM Medication Error Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -244,7 +244,17 @@
                 <div class="flex items-center gap-2 mb-1"><div class="bg-emerald-100 p-2 rounded-lg text-emerald-700 font-bold">NLP-Lite Extractor</div><h3 class="font-bold text-gray-700 text-lg" id="tableTitle">ตารางเจาะลึกความคลาดเคลื่อนทางยา</h3></div>
                 <div class="overflow-x-auto">
                     <table id="nlpTable" class="w-full text-xs text-left border-collapse">
-                        <thead><tr class="bg-emerald-50 text-emerald-800"><th class="p-2 border text-center">วันที่เกิดเหตุ</th><th class="p-2 border text-center">ระดับ</th><th class="p-2 border">ประเภท (Error Type)</th><th class="p-2 border">สถานที่</th><th class="p-2 border">บุคลากรที่ประสบเหตุ</th><th class="p-2 border min-w-[150px]">💊 ยา (ระบุความแรง)</th><th class="p-2 border min-w-[300px]">รายละเอียดเหตุการณ์</th></tr></thead>
+                        <thead>
+                            <tr class="bg-emerald-50 text-emerald-800">
+                                <th class="p-2 border text-center">วันที่เกิดเหตุ</th>
+                                <th class="p-2 border text-center">ระดับ</th>
+                                <th class="p-2 border">ประเภท (Error Type)</th>
+                                <th class="p-2 border text-center">สถานที่</th>
+                                <th class="p-2 border text-center">บุคลากรที่ประสบเหตุ</th>
+                                <th class="p-2 border min-w-[150px]">💊 ยา (ระบุความแรง)</th>
+                                <th class="p-2 border min-w-[300px]">รายละเอียดเหตุการณ์</th>
+                            </tr>
+                        </thead>
                         <tbody id="nlpTableBody"></tbody>
                     </table>
                 </div>
@@ -332,7 +342,7 @@
         function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); document.getElementById('btnLogin').innerText = "เข้าสู่ระบบ"; document.getElementById('btnLogin').disabled = false; }
 
         // ==========================================
-        // 1. NLP-Lite Extractor
+        // 1. NLP-Lite Extractor & Normalization
         // ==========================================
         const stopwords = ['ipd', 'opd', 'med', 'medsheet', 'sheet', 'stat', 'prn', 'and', 'the', 'for', 'home', 'ward', 'doctor', 'nurse', 'pharmacy', 'error', 'type', 'order', 'iv', 'im', 'po', 'pc', 'ac', 'hs', 'od', 'bid', 'tid', 'qid', 'sig', 'tab', 'cap', 'mg', 'ml', 'g', 'hold', 'ect', 'robot', 'tray', 'sts', 'lai', 'admit', 'drug', 'profile', 'mar', 'off', 'oral', 'acid', 'inj', 'injection', 'syr', 'syrup', 'tablet', 'capsule'];
         const drugDictionary = {'a2': 'Trihexyphenidyl 2 mg', 'benz2': 'Trihexyphenidyl 2 mg', 'benzhexol2': 'Trihexyphenidyl 2 mg', 'aca': 'Trihexyphenidyl', 'trihex': 'Trihexyphenidyl', 'a5': 'Trihexyphenidyl 5 mg', 'benz5': 'Trihexyphenidyl 5 mg', 'benzhexol5': 'Trihexyphenidyl 5 mg', 'ris': 'Risperidone', 'ris1': 'Risperidone 1 mg', 'ris2': 'Risperidone 2 mg', 'valium': 'Diazepam 10 mg injection', 'dzp': 'Diazepam', 'dpz': 'Diazepam', 'd2': 'Diazepam 2 mg', 'd5': 'Diazepam 5 mg', 'd10': 'Diazepam 10 mg', 'halo': 'Haloperidol', 'halo dec': 'Haloperidol Decanoate', 'halodec': 'Haloperidol Decanoate', 'vpa': 'Sodium Valproate', 'sod val': 'Sodium Valproate', 'sodval': 'Sodium Valproate', 'veltila': 'Sodium Valproate 500 mg', 'depakin': 'Sodium Valproate', 'dep cr': 'Sodium Valproate', 'dcf': 'Diclofenac', 'vitamin b1': 'Vitamin B1', 'vit b1': 'Vitamin B1', 'vitb1': 'Vitamin B1', 'thiamine': 'Vitamin B1', 'amlo': 'Amlodipine', 'atorvas': 'Atorvastatin', 'cpz': 'Chlorpromazine', 'lora': 'Lorazepam', 't5': 'Clorazepate 5 mg', 'tranxene': 'Clorazepate 5 mg', 'ritalin': 'Methylphenidate', 'rubifen': 'Methylphenidate', 'concertra': 'Methylphenidate', 'clozapine': 'Clozapine', 'mianserin': 'Mianserin', 'nortriptyline': 'Nortriptyline', 'amitriptyline': 'Amitriptyline', 'trazodone': 'Trazodone', 'quetiapine': 'Quetiapine', 'folic acid': 'Folic acid', 'folic': 'Folic acid'};
@@ -396,24 +406,20 @@
             return highlighted;
         }
 
+        // ระบบ Normalization ของบุคคล (ควบรวมชื่อเดิม)
         function normalizePersonnel(name) {
             if (!name) return 'ไม่ระบุ';
             let n = name.toString().trim();
             n = n.replace(/^(นาย|นางสาว|น\.ส\.|นาง|ภก\.|ภญ\.|เภสัชกร)\s*/i, '');
             n = n.split(' ')[0]; 
             if (n === 'ณภปฤณ') return 'กนกนภัส';
-            if (n === 'พิชิตพงษ์' || n === 'พิชญ์พงศ์') return 'พิชญ์พงศ์';
+            if (n === 'พิชิตพงษ์' || n === 'พิชญ์พงศ์' || n === 'พิชญ์พงษ์') return 'พิชญ์พงศ์';
             const cores = ['ชื่นนภา', 'พิชญ์พงศ์', 'กนกนภัส', 'วนัสภรณ์', 'ประภารัตน์', 'ณัฐหทัย', 'มินตรา', 'นฤมล', 'วุฒิไกร'];
             for (let core of cores) { if (n.includes(core)) return core; }
             return n;
         }
 
-        // ==========================================
-        // 2. Data Initialization & Filtering
-        // ==========================================
-        // 🚀 แก้ไข: เพิ่ม filterDept กลับเข้าไป
         const filterFields = { 'บุคลากรที่ประสบเหตุ': 'filterPersonnel', 'ปีงบประมาณ': 'filterFY', 'ไตรมาส': 'filterFQ', 'สถานะ': 'filterStatus', 'สถานที่': 'filterLocation', 'ระดับ': 'filterLevel', 'หน่วยงานที่เกี่ยวข้อง': 'filterDept', 'รายการ': 'filterItem', 'Phase': 'filterPhase' };
-        
         const tsConfig = { plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'title', searchField: 'title', placeholder: 'ทั้งหมด', onChange: function() { applyFilters(); } };
         const thaiMonthsShort = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
         const thaiMonthsFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
@@ -421,25 +427,33 @@
         function normalizeDate(dateStr) {
             if (!dateStr) return null;
             try {
-                let cleanStr = dateStr.toString().trim().split(' ')[0];
+                let cleanStr = dateStr.toString().trim().split(/[ T]/)[0]; // แยกวันที่ออกจาก Time string หรือ ISO T
                 let y, m, d;
                 
+                // ดักจับ Excel Serial Number (เช่น 45573)
                 if (/^\d{5}$/.test(cleanStr)) {
                     let excelDate = new Date(Math.round((cleanStr - 25569) * 86400 * 1000));
-                    y = excelDate.getFullYear() + 543; m = excelDate.getMonth() + 1; d = excelDate.getDate();
+                    y = excelDate.getFullYear() + 543;
+                    m = excelDate.getMonth() + 1;
+                    d = excelDate.getDate();
                 } else {
                     let foundThaiMonth = false;
                     for (let i = 0; i < 12; i++) {
                         if (cleanStr.includes(thaiMonthsShort[i]) || cleanStr.includes(thaiMonthsFull[i])) {
                             m = i + 1;
                             let p = cleanStr.replace(thaiMonthsShort[i], '-').replace(thaiMonthsFull[i], '-').split(/[-/]+/);
-                            p = p.filter(v => v !== ''); d = parseInt(p[0].replace(/\D/g, '')); y = parseInt(p[1].replace(/\D/g, '')); 
+                            p = p.filter(v => v !== ''); d = parseInt(p[0].match(/\d+/)[0]); y = parseInt(p[1].match(/\d+/)[0]); 
                             foundThaiMonth = true; break;
                         }
                     }
                     if (!foundThaiMonth) {
                         let p = cleanStr.split(/[-/]/); if (p.length < 3) return null;
-                        let n0 = parseInt(p[0].replace(/\D/g, '')); let n1 = parseInt(p[1].replace(/\D/g, '')); let n2 = parseInt(p[2].replace(/\D/g, ''));
+                        
+                        // ใช้ Match ตัวเลขชุดแรก เพื่อป้องกันเลขเวลา 17000000 มาปน
+                        let n0 = parseInt(p[0].match(/\d+/)[0]); 
+                        let n1 = parseInt(p[1].match(/\d+/)[0]); 
+                        let n2 = parseInt(p[2].match(/\d+/)[0]);
+                        
                         if (n0 > 1000) { y = n0; m = n1; d = n2; } else if (n2 > 1000) { y = n2; m = n1; d = n0; } else { y = n2; m = n1; d = n0; }
                     }
                     if (y < 100) y += 2500; else if (y >= 1900 && y <= 2100) y += 543; else if (y > 3000) y -= 543; 
@@ -500,7 +514,7 @@
         function initSlicers() {
             for (const [colName, elementId] of Object.entries(filterFields)) {
                 let el = document.getElementById(elementId);
-                if (!el) continue; // 🛡️ Failsafe กันพังถ้าหน้า HTML ไม่มีกล่องนี้
+                if (!el) continue; 
 
                 let uniqueValues = [...new Set(rawData.map(item => {
                     if (colName === 'ระดับ') return item._level;
@@ -592,13 +606,13 @@
             });
 
             const sortedItems = Object.keys(itemCounts).sort((a,b) => itemCounts[b]-itemCounts[a]).slice(0, 10);
-            renderChart('errorTypeChart', 'bar', sortedItems, sortedItems.map(k => itemCounts[k]), '#6366f1', true, 'errorType');
+            renderChart('errorTypeChart', 'bar', sortedItems, sortedItems.map(k => itemCounts[k]), '#6366f1', true, 'errorType', totalFiltered);
             const sortedDrugs = Object.keys(drugCounts).sort((a,b) => drugCounts[b] - drugCounts[a]).slice(0, 15);
-            renderChart('drugChart', 'bar', sortedDrugs, sortedDrugs.map(d => drugCounts[d]), '#10b981', true, 'drug');
+            renderChart('drugChart', 'bar', sortedDrugs, sortedDrugs.map(d => drugCounts[d]), '#10b981', true, 'drug', totalFiltered);
             renderRelationChart('relationChart', sortedDrugs, relationData, Array.from(allItemsFound));
             
             const sortedPersonnel = Object.keys(personnelCounts).filter(k=>k!=='ไม่ระบุ').sort((a,b) => personnelCounts[b] - personnelCounts[a]).slice(0, 10);
-            renderChart('personnelChart', 'bar', sortedPersonnel, sortedPersonnel.map(p => personnelCounts[p]), '#d946ef', true, 'personnel');
+            renderChart('personnelChart', 'bar', sortedPersonnel, sortedPersonnel.map(p => personnelCounts[p]), '#d946ef', true, 'personnel', totalFiltered);
         }
 
         function renderChart(canvasId, type, labels, data, color, isHorizontal, filterType, total) {
@@ -643,7 +657,12 @@
             let ipdVolAvg = parseFloat(document.getElementById('ipdVolume').value) || 1;
             
             let monthsSet = new Set();
-            activeData.forEach(r => { if(r._dateObj && r._dateObj.intBE >= 25621000) monthsSet.add(`${r._dateObj.year}-${r._dateObj.month.toString().padStart(2, '0')}`); });
+            activeData.forEach(r => { 
+                // บังคับเอายอดตั้งแต่ ต.ค. 2562 (25621000) เป็นต้นไป
+                if(r._dateObj && r._dateObj.intBE >= 25621000) {
+                    monthsSet.add(`${r._dateObj.year}-${r._dateObj.month.toString().padStart(2, '0')}`); 
+                }
+            });
             let monthsArr = Array.from(monthsSet).sort();
             
             if (appMode === 'JVL') {
@@ -665,9 +684,6 @@
             let totalOpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m]?.opd || 0), 0) : opdVolAvg;
             let totalIpdVol = appMode === 'JVL' ? monthsArr.reduce((sum, m) => sum + (kpiVolumesDB[m]?.ipd || 0), 0) : ipdVolAvg;
             
-            // Failsafe หากไม่มียอด Volume เลย ให้ใช้ 1000 เพื่อให้ Rate = Count (ไม่ให้ค่าพุ่งทะลุเพดาน)
-            if(totalOpdVol<=0) totalOpdVol=1000; if(totalIpdVol<=0) totalIpdVol=1000;
-
             const kpiDef = [
                 { id: 'CPM201_OPD', nrls: 'CPM201', name: 'Prescribing OPD', limit: 10, vol: totalOpdVol }, { id: 'CPM201_IPD', nrls: 'CPM201', name: 'Prescribing IPD', limit: 10, vol: totalIpdVol },
                 { id: 'CPM202_OPD', nrls: 'CPM202', name: 'Transcribing OPD', limit: 10, vol: totalOpdVol }, { id: 'CPM202_IPD', nrls: 'CPM202', name: 'Transcribing IPD', limit: 10, vol: totalIpdVol },
@@ -678,7 +694,8 @@
 
             const tbody = document.getElementById('kpiTableBody'); tbody.innerHTML = '';
             kpiDef.forEach(k => {
-                let rate = ((counts[k.id] || 0) * 1000) / k.vol; let isPass = rate <= k.limit;
+                let v = k.vol <= 0 ? 1000 : k.vol; // กันพัง
+                let rate = ((counts[k.id] || 0) * 1000) / v; let isPass = rate <= k.limit;
                 let tr = document.createElement('tr'); tr.classList.add('hover:bg-rose-100', 'cursor-pointer', 'transition');
                 tr.onclick = () => triggerDrillDown('kpi', k.id);
                 tr.innerHTML = `<td class="p-2 border font-bold text-gray-800">${k.name}</td><td class="p-2 border text-center text-rose-700">&lt; ${k.limit} ต่อ 1,000</td><td class="p-2 border text-center font-bold">${counts[k.id] || 0}</td><td class="p-2 border text-center font-bold ${isPass?'text-green-600':'text-red-600'}">${rate.toFixed(2)}</td><td class="p-2 border text-center">${isPass?'<span class="bg-green-100 text-green-700 px-2 rounded">ผ่าน</span>':'<span class="bg-red-100 text-red-700 px-2 rounded">เกิน</span>'}</td>`;
@@ -703,11 +720,11 @@
                     let oVol = appMode === 'JVL' ? (kpiVolumesDB[m]?.opd || 0) : opdVolAvg;
                     let iVol = appMode === 'JVL' ? (kpiVolumesDB[m]?.ipd || 0) : ipdVolAvg;
                     
-                    // Failsafe ให้เรตเท่ากับจำนวนจริงหากไม่ได้กรอกปริมาณ
-                    if(oVol<=0) oVol=1000; if(iVol<=0) iVol=1000;
+                    let oSafe = oVol <= 0 ? 1000 : oVol;
+                    let iSafe = iVol <= 0 ? 1000 : iVol;
 
-                    opdData.push({ rate: ((opdCount*1000)/oVol).toFixed(2), count: opdCount, vol: oVol===1000 && opdCount>0 ? 'ไม่ระบุ' : oVol });
-                    ipdData.push({ rate: ((ipdCount*1000)/iVol).toFixed(2), count: ipdCount, vol: iVol===1000 && ipdCount>0 ? 'ไม่ระบุ' : iVol });
+                    opdData.push({ rate: ((opdCount*1000)/oSafe).toFixed(2), count: opdCount, vol: oVol<=0 && opdCount>0 ? 'ไม่ระบุ' : oVol });
+                    ipdData.push({ rate: ((ipdCount*1000)/iSafe).toFixed(2), count: ipdCount, vol: iVol<=0 && ipdCount>0 ? 'ไม่ระบุ' : iVol });
                     targetData.push(step.target);
                 });
                 renderRunChart(`runChart_${step.id}`, runChartLabels, opdData, ipdData, targetData, step.target);
@@ -778,7 +795,17 @@
             [...data].sort((a,b) => b._dateObj.intBE - a._dateObj.intBE).forEach(r => {
                 const displayDate = r._dateObj ? `${r._dateObj.day.toString().padStart(2,'0')}/${r._dateObj.month.toString().padStart(2,'0')}/${r._dateObj.year}` : r['วันที่เกิดเหตุ'];
                 let drugsHtml = r._extractedDrugs.length > 0 ? r._extractedDrugs.map(d => `<span class="inline-block bg-emerald-100 text-emerald-800 px-2 rounded mb-1 mr-1">${d}</span>`).join('') : `-`;
-                let tr = document.createElement('tr'); tr.innerHTML = `<td class="p-2 border text-center">${displayDate}</td><td class="p-2 border text-center font-bold">${r._level}</td><td class="p-2 border text-gray-700"><span class="font-bold">${r['รายการ']}</span><br><span class="text-[10px] text-gray-400">${r['สถานที่']}</span><br><span class="text-[10px] text-fuchsia-600 font-bold">${r._personnel}</span></td><td class="p-2 border">${drugsHtml}</td><td class="p-3 border text-gray-600 text-[13px]">[${r['เลขที่ใบความเสี่ยง']}] ${highlightText(r['รายละเอียด'], r._extractedDrugs)}</td>`;
+                let tr = document.createElement('tr'); 
+                
+                tr.innerHTML = `
+                    <td class="p-2 border text-center whitespace-nowrap">${displayDate}</td>
+                    <td class="p-2 border text-center"><span class="px-2 py-1 ${['E','F','G','H','I'].includes(r._level)?'bg-red-50 text-red-700 border-red-200':'bg-gray-100 text-gray-700 border-gray-200'} rounded font-bold border">${r._level}</span></td>
+                    <td class="p-2 border font-bold text-gray-700">${r['รายการ']}</td>
+                    <td class="p-2 border text-center">${r['สถานที่']}</td>
+                    <td class="p-2 border text-center font-bold text-fuchsia-700">${r._personnel}</td>
+                    <td class="p-2 border align-top">${drugsHtml}</td>
+                    <td class="p-3 border text-gray-600 leading-relaxed min-w-[300px] text-[13px]">[${r['เลขที่ใบความเสี่ยง']}] ${highlightText(r['รายละเอียด'], r._extractedDrugs)}</td>
+                `;
                 body.appendChild(tr);
             });
             nlpTableInstance = $('#nlpTable').DataTable({ dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"l<"flex"Bf>>rtip', pageLength: 10, buttons: ['excel', 'print'] });
